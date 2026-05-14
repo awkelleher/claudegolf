@@ -125,9 +125,17 @@ tr.dimmed td{opacity:0.4;text-decoration:line-through}
 <div class="club-cards" id="club-cards"></div>
 
 <div class="charts-grid">
-  <div class="chart-panel"><h3>Dispersion (Carry vs Side)</h3><canvas id="chart-dispersion"></canvas></div>
+  <div class="chart-panel">
+    <h3 style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
+      <span>Dispersion (Carry vs Side)</span>
+      <select class="outlier-select" id="dispersion-club" onchange="refresh()" style="font-size:0.78rem">
+        <option value="all">All clubs</option>
+      </select>
+    </h3>
+    <canvas id="chart-dispersion"></canvas>
+  </div>
   <div class="chart-panel"><h3>Carry by Club</h3><canvas id="chart-club-carry"></canvas></div>
-  <div class="chart-panel"><h3>Smash Factor Distribution</h3><canvas id="chart-smash"></canvas></div>
+  <div class="chart-panel"><h3>Average Smash by Club</h3><canvas id="chart-smash"></canvas></div>
   <div class="chart-panel"><h3>Spin Rate by Club</h3><canvas id="chart-spin"></canvas></div>
 </div>
 
@@ -719,12 +727,32 @@ function renderDispersion(shots) {
   const ctx = document.getElementById('chart-dispersion').getContext('2d');
   if (chartDispersion) chartDispersion.destroy();
 
+  // Per-chart club picker. Defaults to "all".
+  const sel = document.getElementById('dispersion-club');
+  const selectedClub = sel ? sel.value : 'all';
+
   const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
     const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
 
-  const datasets = clubs.map(club => {
+  // Keep the dropdown in sync with whatever clubs are currently in scope.
+  if (sel) {
+    const existing = new Set(Array.from(sel.options).map(o => o.value));
+    clubs.forEach(c => {
+      if (!existing.has(c)) {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        sel.appendChild(opt);
+      }
+    });
+  }
+
+  const isolated = selectedClub !== 'all';
+  const drawClubs = isolated ? [selectedClub] : clubs;
+
+  const datasets = drawClubs.map(club => {
     const pts = shots.filter(s => s.club === club && s.carry_m != null && s.side_m != null);
     return {
       label: club,
@@ -732,10 +760,50 @@ function renderDispersion(shots) {
       backgroundColor: (CLUB_COLORS[club] || '#6b7280') + 'cc',
       borderColor: CLUB_COLORS[club] || '#6b7280',
       borderWidth: 1,
-      pointRadius: 5,
-      pointHoverRadius: 7
+      pointRadius: isolated ? 6 : 5,
+      pointHoverRadius: 8,
     };
   });
+
+  // When isolated, overlay a 1-sigma ellipse around the centroid so you
+  // can see the actual dispersion shape, not just a cloud of dots.
+  if (isolated && datasets.length && datasets[0].data.length >= 3) {
+    const pts = datasets[0].data;
+    const xs = pts.map(p => p.x);
+    const ys = pts.map(p => p.y);
+    const xMean = xs.reduce((a, b) => a + b, 0) / xs.length;
+    const yMean = ys.reduce((a, b) => a + b, 0) / ys.length;
+    const xStd = Math.sqrt(xs.reduce((s, v) => s + (v - xMean) ** 2, 0) / (xs.length - 1));
+    const yStd = Math.sqrt(ys.reduce((s, v) => s + (v - yMean) ** 2, 0) / (ys.length - 1));
+    const ellipsePts = [];
+    for (let i = 0; i <= 64; i++) {
+      const t = (i / 64) * Math.PI * 2;
+      ellipsePts.push({ x: xMean + xStd * Math.cos(t), y: yMean + yStd * Math.sin(t) });
+    }
+    datasets.push({
+      label: selectedClub + ' 1σ',
+      data: ellipsePts,
+      type: 'line',
+      borderColor: (CLUB_COLORS[selectedClub] || '#6b7280'),
+      borderDash: [4, 4],
+      borderWidth: 1.5,
+      pointRadius: 0,
+      fill: false,
+      tension: 0,
+      showLine: true,
+      order: 99,
+    });
+    datasets.push({
+      label: selectedClub + ' centroid',
+      data: [{ x: xMean, y: yMean }],
+      backgroundColor: (CLUB_COLORS[selectedClub] || '#6b7280'),
+      borderColor: '#fff',
+      borderWidth: 2,
+      pointRadius: 7,
+      pointStyle: 'crossRot',
+      order: 100,
+    });
+  }
 
   chartDispersion = new Chart(ctx, {
     type: 'scatter',
@@ -834,47 +902,85 @@ function renderClubCarryChart(shots) {
 }
 
 // --- Smash Factor Chart ---
+// Tour smash benchmarks by club, matching analysis.py / benchmarks.py
+const TOUR_SMASH = {Dr:1.49, '3W':1.48, '5W':1.48, '7W':1.46, '3i':1.44, '4i':1.43, '5i':1.41, '6i':1.40, '7i':1.38, '8i':1.35, '9i':1.32, PW:1.27, GW:1.24, SW:1.20, LW:1.18};
+
 function renderSmashChart(shots) {
   const ctx = document.getElementById('chart-smash').getContext('2d');
   if (chartSmash) chartSmash.destroy();
 
-  const withSmash = shots.filter(s => s.smash_factor != null);
-  const colors = withSmash.map(s => {
-    if (s.smash_factor >= 1.42) return '#10b981';
-    if (s.smash_factor >= 1.30) return '#f59e0b';
-    if (s.smash_factor >= 1.0) return '#8a95a3';
-    return '#ef4444';
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
 
+  // Compute avg smash per club from shots that actually have it (TopTracer rows won't).
+  const avgSmash = clubs.map(club => {
+    const vals = shots.filter(s => s.club === club && s.smash_factor != null).map(s => s.smash_factor);
+    return vals.length ? avg(vals) : null;
+  });
+  const counts = clubs.map(club => shots.filter(s => s.club === club && s.smash_factor != null).length);
+  const tourSmash = clubs.map(c => TOUR_SMASH[c] != null ? TOUR_SMASH[c] : null);
+
   chartSmash = new Chart(ctx, {
-    type: 'bar',
     data: {
-      labels: withSmash.map((s, i) => s.club + ' #' + s.shot_num),
-      datasets: [{
-        data: withSmash.map(s => s.smash_factor),
-        backgroundColor: colors,
-        borderWidth: 0
-      }]
+      labels: clubs,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Your avg',
+          data: avgSmash,
+          backgroundColor: clubs.map(c => (CLUB_COLORS[c] || '#6b7280') + 'cc'),
+          borderColor: clubs.map(c => CLUB_COLORS[c] || '#6b7280'),
+          borderWidth: 1,
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: 'Tour avg',
+          data: tourSmash,
+          borderColor: '#f97316',
+          backgroundColor: 'transparent',
+          borderDash: [4, 4],
+          pointRadius: 4,
+          pointBackgroundColor: '#f97316',
+          fill: false,
+          tension: 0,
+          spanGaps: true,
+          order: 1,
+        },
+      ],
     },
     options: {
       responsive: true,
       plugins: {
-        legend: { display: false },
+        legend: { labels: { color: '#8a95a3', font: { size: 11 } } },
         tooltip: {
           callbacks: {
             label: function(c) {
-              const s = withSmash[c.dataIndex];
-              return s.session_date + ' | ' + s.club + ' #' + s.shot_num + ' | Smash: ' + s.smash_factor.toFixed(3);
-            }
-          }
-        }
+              const club = c.label;
+              const v = c.parsed.y;
+              if (v == null) return c.dataset.label + ': no data';
+              if (c.dataset.label === 'Your avg') {
+                const n = counts[clubs.indexOf(club)];
+                return 'Your avg: ' + v.toFixed(3) + '  (' + n + ' shots)';
+              }
+              return 'Tour avg: ' + v.toFixed(2);
+            },
+          },
+        },
       },
       scales: {
-        x: { display: false },
-        y: { title: { display: true, text: 'Smash Factor', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' },
-          suggestedMin: 0.5, suggestedMax: 1.6 }
-      }
-    }
+        x: { grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } },
+        y: {
+          title: { display: true, text: 'Smash Factor', color: '#8a95a3' },
+          grid: { color: '#2d3640' },
+          ticks: { color: '#8a95a3' },
+          suggestedMin: 1.0,
+          suggestedMax: 1.55,
+        },
+      },
+    },
   });
 }
 
