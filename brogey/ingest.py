@@ -24,6 +24,10 @@ from brogey.db import service_client
 
 API_URL = "https://golf-player-activities.trackmangolf.com/api/reports/getactivityreport"
 
+# Skip stroke groups where TrackMan didn't tag a club (free-practice mode).
+# User confirmed these are uninformative without club labels.
+SKIP_UNTAGGED_CLUB = True
+
 # Map TrackMan's Club enum to our short-code convention.
 CLUB_MAP = {
     "Driver": "Dr",
@@ -232,8 +236,16 @@ def pull_activity(activity_id: str) -> tuple[str, int]:
         club_short = _apply_club_override(
             activity_id, trackman_club, _short_club(trackman_club)
         )
+        if SKIP_UNTAGGED_CLUB and club_short == "Unknown":
+            continue
         for i, stroke in enumerate(sg.get("Strokes") or [], start=1):
             rows.append(_row_for_stroke(session_id, club_short, i, stroke))
+
+    # If every stroke group in this activity was Unknown, drop the empty
+    # session row so we don't leave a stub behind.
+    if not rows:
+        sb.table("sessions").delete().eq("id", session_id).execute()
+        return session_id, 0
 
     # Chunked upsert
     CHUNK = 200

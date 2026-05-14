@@ -143,8 +143,12 @@ def ingest_toptracer_csv(
     # the L/R sign (negative=left). Same for curve_signed_yd. We store
     # offline as side_m. Curve goes into raw_measurement.
     rows = []
+    skipped_unknown = 0
     for r in df.itertuples(index=False):
         club = getattr(r, "club", default_club) if has_club_col else default_club
+        if club == "Unknown":
+            skipped_unknown += 1
+            continue
         shot_num = int(getattr(r, "shot_number"))
 
         flat_carry_yd = _clean(getattr(r, "flat_carry_yd", None))
