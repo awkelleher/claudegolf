@@ -11,6 +11,7 @@ from brogey.ingest import (
     extract_activity_id,
     pull_activity,
 )
+from brogey.toptracer import ingest_toptracer_csv
 
 
 @click.group()
@@ -93,6 +94,17 @@ def pull_all_cmd():
     click.echo(f"\nDone. {total_shots} shots across {len(ids) - len(failed)} sessions.")
     if failed:
         click.echo(f"{len(failed)} sessions failed — see above.")
+
+
+@cli.command("ingest-toptracer")
+@click.argument("csv_path", type=click.Path(exists=True, dir_okay=False, path_type=__import__('pathlib').Path))
+@click.option("--date", "session_date", default=None, help="YYYY-MM-DD (overrides date inferred from filename).")
+@click.option("--club", default=None, help="Club to assign all shots in this CSV. Overrides filename inference.")
+def ingest_toptracer(csv_path, session_date: str | None, club: str | None):
+    """Ingest a TopTracer CSV into Supabase as a new session."""
+    from pathlib import Path as _Path
+    session_id, n = ingest_toptracer_csv(_Path(csv_path), session_date=session_date, club_override=club)
+    click.echo(f"stored {n} shots  session={session_id}")
 
 
 @cli.command("new-session")
