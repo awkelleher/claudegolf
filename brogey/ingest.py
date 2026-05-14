@@ -53,6 +53,49 @@ def _short_club(club_name: str | None) -> str:
     return CLUB_MAP.get(key, club_name or "Unknown")
 
 
+# Per-activity club overrides for sessions where the user picked the wrong
+# club in the TrackMan app. Format: { activity_id: { trackman_club_name: short_code } }
+#
+# A blanket "in any historical activity, 3Wood means 5W" rule applies only
+# to activity IDs in HISTORICAL_MISLABELED — known cases the user has
+# corrected. New activities pass through unchanged.
+HISTORICAL_MISLABELED: dict[str, str] = {
+    "3Wood": "5W",   # user mislabeled their 5W as "3 Wood" in the app
+    "7Wood": "7i",   # user mislabeled their 7-iron as "7 Wood" in the app
+}
+
+# Set of activity IDs where the historical mislabel correction applies.
+# Populated lazily from the DB on first call so users don't have to keep
+# this list in sync by hand.
+_historical_activity_ids: set[str] | None = None
+
+
+def _historical_activities() -> set[str]:
+    """Activity IDs that pre-date the user's TrackMan-app club fix."""
+    global _historical_activity_ids
+    if _historical_activity_ids is None:
+        try:
+            sb = service_client()
+            rows = (
+                sb.table("sessions")
+                .select("external_id,session_date")
+                .eq("source", "trackman")
+                .lte("session_date", "2026-05-08")  # last known mislabel date
+                .execute()
+                .data
+            )
+            _historical_activity_ids = {r["external_id"] for r in rows if r.get("external_id")}
+        except Exception:
+            _historical_activity_ids = set()
+    return _historical_activity_ids
+
+
+def _apply_club_override(activity_id: str, trackman_club: str | None, short: str) -> str:
+    if trackman_club and activity_id in _historical_activities():
+        return HISTORICAL_MISLABELED.get(trackman_club, short)
+    return short
+
+
 def extract_activity_id(url_or_id: str) -> str:
     """Pull an ActivityId out of either a raw UUID or a TrackMan share URL."""
     s = url_or_id.strip()
@@ -130,6 +173,13 @@ def _row_for_stroke(session_id: str, club_short: str, shot_num: int, stroke: dic
         "smash_factor": (
             round(m["SmashFactor"], 3) if m.get("SmashFactor") is not None else None
         ),
+        # Cross-source first-class fields (both TrackMan + TopTracer)
+        "total_m": m.get("Total"),
+        "launch_angle_deg": m.get("LaunchAngle"),
+        "max_height_m": m.get("MaxHeight"),
+        "landing_angle_deg": m.get("LandingAngle"),
+        "hang_time_s": m.get("HangTime"),
+        "curve_m": m.get("Curve"),
         "raw_measurement": raw,
     }
 
@@ -178,7 +228,10 @@ def pull_activity(activity_id: str) -> tuple[str, int]:
 
     rows: list[dict] = []
     for sg in stroke_groups:
-        club_short = _short_club(sg.get("Club"))
+        trackman_club = sg.get("Club")
+        club_short = _apply_club_override(
+            activity_id, trackman_club, _short_club(trackman_club)
+        )
         for i, stroke in enumerate(sg.get("Strokes") or [], start=1):
             rows.append(_row_for_stroke(session_id, club_short, i, stroke))
 

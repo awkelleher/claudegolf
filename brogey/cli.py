@@ -107,6 +107,36 @@ def ingest_toptracer(csv_path, session_date: str | None, club: str | None):
     click.echo(f"stored {n} shots  session={session_id}")
 
 
+@cli.command("ingest-toptracer-all")
+@click.option(
+    "--glob-pattern",
+    "pattern",
+    default="toptracer_*.csv",
+    help="Glob pattern to match CSV files in cwd.",
+)
+def ingest_toptracer_all(pattern: str):
+    """Ingest every TopTracer CSV in the current directory matching <pattern>."""
+    from pathlib import Path as _Path
+    matches = sorted(_Path(".").glob(pattern))
+    if not matches:
+        click.echo(f"No CSVs match {pattern!r} in cwd.")
+        return
+    click.echo(f"Found {len(matches)} CSVs.")
+    total = 0
+    failed: list[tuple[str, str]] = []
+    for p in matches:
+        try:
+            sid, n = ingest_toptracer_csv(p)
+            total += n
+            click.echo(f"  ok  {p.name}  ({n} shots)")
+        except Exception as e:  # noqa: BLE001
+            failed.append((p.name, str(e)))
+            click.echo(f"  FAIL {p.name}: {e}")
+    click.echo(f"\nDone. {total} shots across {len(matches) - len(failed)} files.")
+    if failed:
+        click.echo(f"{len(failed)} failed — see above.")
+
+
 @cli.command("new-session")
 @click.argument("url_or_id")
 @click.option("--skip-coach", is_flag=True, help="Pull only; don't ask Brogey yet.")

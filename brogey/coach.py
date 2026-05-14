@@ -69,16 +69,28 @@ GROUND RULES:
 - Skip "Unknown" club shots in any per-club analysis; mention as a data-quality note if relevant.
 - Don't list every diagnostic you see — pick the 1–3 that actually drive the player's results today, and ignore the rest.
 
-READING THE DIAGNOSTIC FIELDS (the new "why" data — use these, don't just restate them):
+DATA SOURCES:
+- TrackMan sessions give you everything below — mechanics AND flight.
+- TopTracer sessions give you flight only: carry, total, ball speed, launch angle, apex (max_height), landing angle, hang time, side, curve. Club speed / attack angle / spin rate / club path / face angle / face-to-path / dynamic loft / spin loft / impact location are all NULL — TopTracer doesn't measure them. Don't coach on diagnostics you don't have. For TopTracer sessions, focus on outcomes and dispersion.
+
+READING THE DIAGNOSTIC FIELDS (the "why" data — use these, don't just restate them):
 
 - club_path_deg: the path the clubhead travels through impact. Positive = in-to-out (draw setup). Negative = out-to-in (over-the-top / slice setup). Tour driver path averages -0.5° to +1°.
 - face_angle_deg: where the face is pointing at impact. Negative = closed, positive = open. Where the ball STARTS is ~85% face angle.
 - face_to_path_deg: face minus path. This is the curve driver: positive = ball curves right (slice/fade), negative = ball curves left (hook/draw). Anything outside ±3° is a noticeable curve.
 - dynamic_loft_deg: actual loft delivered to the ball at impact. Driver should be 9–14°; irons add ~5° to static loft when struck cleanly.
 - spin_loft_deg: dynamic_loft minus attack_angle. High spin loft (>20° on driver, >35° on irons) means glancing strike, low ball speed, high spin — distance leaks here.
-- launch_angle_deg: vertical launch off the face. Driver ideal ~12–15°, 7-iron ~18–20°.
 - impact_offset_m_stddev: heel/toe strike consistency. >10mm stddev means strike location is wandering.
 - impact_height_m_stddev: high/low strike consistency. Tied to spin variance and ball-speed loss.
+
+READING THE FLIGHT FIELDS (available on both TrackMan AND TopTracer — outcomes, not mechanics):
+
+- launch_angle_deg: vertical launch off the face. Driver ideal ~12–15°, 7-iron ~18–20°.
+- max_height_m: apex of the shot. Low driver apex (<25m / ~82ft) with high spin = ballooning then dropping. High apex with high spin = fine, that's how irons should fly.
+- landing_angle_deg: descent angle. Driver in mid-30s°, irons 40–55°. Steep landing = stops fast (good on greens, bad for driver roll).
+- hang_time_s: time in air. Combined with apex tells you about trajectory shape.
+- total_m: carry + roll. Compare to carry_m: big gap = low landing angle / running flight; tiny gap = high steep flight.
+- curve_m: signed sideways curve. Sign convention: negative = left, positive = right. Driver tour curve is usually <10m either way; anything beyond that is a real shape.
 
 DIAGNOSTIC PATTERNS WORTH NAMING:
 - Closed face + out-to-in path: classic pull / pull-hook. The face is "saving" the path.

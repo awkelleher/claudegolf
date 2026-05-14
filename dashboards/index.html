@@ -186,7 +186,7 @@ async function loadFromSupabase() {
   while (true) {
     const { data, error } = await sb
       .from('shots')
-      .select('shot_num,club,club_speed_mps,attack_angle_deg,ball_speed_mps,spin_rate_rpm,carry_m,side_m,smash_factor,raw_measurement,session_id,sessions(session_date)')
+      .select('shot_num,club,club_speed_mps,attack_angle_deg,ball_speed_mps,spin_rate_rpm,carry_m,side_m,smash_factor,total_m,launch_angle_deg,max_height_m,landing_angle_deg,hang_time_s,curve_m,raw_measurement,session_id,sessions(session_date,source)')
       .range(from, from + PAGE - 1);
     if (error) throw error;
     if (!data || !data.length) break;
@@ -199,8 +199,10 @@ async function loadFromSupabase() {
       RAW.push({
         session_date: sd,
         session_id: row.session_id,
+        source: row.sessions ? row.sessions.source : null,
         shot_num: row.shot_num,
         club: row.club,
+        // Always-meaningful primary metrics
         club_speed_mps: row.club_speed_mps,
         attack_angle_deg: row.attack_angle_deg,
         ball_speed_mps: row.ball_speed_mps,
@@ -208,19 +210,21 @@ async function loadFromSupabase() {
         carry_m: row.carry_m,
         side_m: row.side_m,
         smash_factor: row.smash_factor,
-        // rich diagnostics
+        // Cross-source first-class flight metrics (now real columns)
+        total_m: row.total_m,
+        launch_angle_deg: row.launch_angle_deg,
+        max_height_m: row.max_height_m,
+        landing_angle_deg: row.landing_angle_deg,
+        hang_time_s: row.hang_time_s,
+        curve_m: row.curve_m,
+        // TrackMan-only diagnostics still pulled from raw_measurement
         club_path_deg: m.ClubPath ?? null,
         face_angle_deg: m.FaceAngle ?? null,
         face_to_path_deg: m.FaceToPath ?? null,
         dynamic_loft_deg: m.DynamicLoft ?? null,
         spin_loft_deg: m.SpinLoft ?? null,
-        launch_angle_deg: m.LaunchAngle ?? null,
         launch_direction_deg: m.LaunchDirection ?? null,
         spin_axis_deg: m.SpinAxis ?? null,
-        max_height_m: m.MaxHeight ?? null,
-        landing_angle_deg: m.LandingAngle ?? null,
-        hang_time_s: m.HangTime ?? null,
-        total_m: m.Total ?? null,
         impact_offset_m: imp.ImpactOffset ?? null,
         impact_height_m: imp.ImpactHeight ?? null,
       });

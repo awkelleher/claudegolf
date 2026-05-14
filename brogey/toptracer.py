@@ -187,6 +187,13 @@ def ingest_toptracer_csv(
                 "carry_m": (flat_carry_yd * YD_TO_M) if flat_carry_yd is not None else None,
                 "side_m": (offline_signed_yd * YD_TO_M) if offline_signed_yd is not None else None,
                 "smash_factor": None,             # needs club speed
+                # Cross-source first-class fields
+                "total_m": (distance_trend_yd * YD_TO_M) if distance_trend_yd is not None else None,
+                "launch_angle_deg": launch_angle,
+                "max_height_m": (height_yd * YD_TO_M) if height_yd is not None else None,
+                "landing_angle_deg": landing_angle,
+                "hang_time_s": hang_time,
+                "curve_m": (curve_signed_yd * YD_TO_M) if curve_signed_yd is not None else None,
                 "raw_measurement": raw,
             }
         )

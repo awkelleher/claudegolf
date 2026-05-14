@@ -31,15 +31,22 @@ class ClubSummary:
     face_to_path_deg_median: float | None     # face - path; the curve driver
     dynamic_loft_deg_median: float | None     # actual loft delivered to ball
     spin_loft_deg_median: float | None        # dynamic loft - attack angle (spin driver)
-    launch_angle_deg_median: float | None
     impact_offset_m_stddev: float | None      # heel/toe strike consistency
     impact_height_m_stddev: float | None      # high/low strike consistency
+    # --- Cross-source flight metrics (TrackMan + TopTracer) ---
+    launch_angle_deg_median: float | None
+    max_height_m_median: float | None
+    landing_angle_deg_median: float | None
+    hang_time_s_median: float | None
+    total_m_median: float | None
+    curve_m_median: float | None
 
 
 @dataclass
 class SessionInsightBundle:
     session_id: str
     session_date: str
+    source: str                              # 'trackman' | 'toptracer' | etc.
     n_shots: int
     clubs_used: list[str]
     per_club: list[ClubSummary]
@@ -100,13 +107,20 @@ def _summarize_club(club: str, group: pd.DataFrame) -> ClubSummary:
     carry_median = float(carry.median()) if len(carry) else None
     smash_median = float(smash.median()) if len(smash) else None
 
-    # Rich diagnostics pulled from raw_measurement.measurement / .impact_location
+    # Cross-source flight metrics (first-class columns)
+    launch = group.get("launch_angle_deg", pd.Series(dtype=float)).dropna()
+    max_h = group.get("max_height_m", pd.Series(dtype=float)).dropna()
+    landing = group.get("landing_angle_deg", pd.Series(dtype=float)).dropna()
+    hang = group.get("hang_time_s", pd.Series(dtype=float)).dropna()
+    total = group.get("total_m", pd.Series(dtype=float)).dropna()
+    curve = group.get("curve_m", pd.Series(dtype=float)).dropna()
+
+    # TrackMan-only diagnostics still come from raw_measurement
     club_path = _raw_series(group, "measurement", "ClubPath")
     face_angle = _raw_series(group, "measurement", "FaceAngle")
     face_to_path = _raw_series(group, "measurement", "FaceToPath")
     dynamic_loft = _raw_series(group, "measurement", "DynamicLoft")
     spin_loft = _raw_series(group, "measurement", "SpinLoft")
-    launch_angle = _raw_series(group, "measurement", "LaunchAngle")
     impact_off = _raw_series(group, "impact_location", "ImpactOffset")
     impact_h = _raw_series(group, "impact_location", "ImpactHeight")
 
@@ -126,9 +140,14 @@ def _summarize_club(club: str, group: pd.DataFrame) -> ClubSummary:
         face_to_path_deg_median=_median_or_none(face_to_path),
         dynamic_loft_deg_median=_median_or_none(dynamic_loft),
         spin_loft_deg_median=_median_or_none(spin_loft),
-        launch_angle_deg_median=_median_or_none(launch_angle),
         impact_offset_m_stddev=_stddev_or_none(impact_off),
         impact_height_m_stddev=_stddev_or_none(impact_h),
+        launch_angle_deg_median=_median_or_none(launch),
+        max_height_m_median=_median_or_none(max_h),
+        landing_angle_deg_median=_median_or_none(landing),
+        hang_time_s_median=_median_or_none(hang),
+        total_m_median=_median_or_none(total),
+        curve_m_median=_median_or_none(curve),
     )
 
 
@@ -221,6 +240,7 @@ def analyze_session(session_id: str) -> SessionInsightBundle:
     return SessionInsightBundle(
         session_id=session_id,
         session_date=session_row["session_date"],
+        source=session_row.get("source") or "trackman",
         n_shots=len(df),
         clubs_used=sorted(df["club"].unique().tolist()),
         per_club=per_club,
