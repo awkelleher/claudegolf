@@ -155,6 +155,10 @@ tr.dimmed td{opacity:0.4;text-decoration:line-through}
       <th data-key="spin_rate_rpm">Spin<span class="sort-arrow"></span></th>
       <th data-key="carry_m">Carry<span class="sort-arrow"></span></th>
       <th data-key="side_m">Side<span class="sort-arrow"></span></th>
+      <th data-key="club_path_deg" title="Club path through impact. -/+ = out-to-in / in-to-out">Path<span class="sort-arrow"></span></th>
+      <th data-key="face_angle_deg" title="Face angle at impact. -/+ = closed/open">Face<span class="sort-arrow"></span></th>
+      <th data-key="face_to_path_deg" title="Face minus path. The curve driver.">F-P<span class="sort-arrow"></span></th>
+      <th data-key="dynamic_loft_deg" title="Actual loft delivered to the ball">Dyn Loft<span class="sort-arrow"></span></th>
       <th>Quality</th>
     </tr></thead>
     <tbody id="shots-body"></tbody>
@@ -1132,6 +1136,10 @@ function renderShotsTable(data) {
       '<td>' + (s.spin_rate_rpm != null ? s.spin_rate_rpm.toLocaleString() : '--') + '</td>' +
       '<td>' + fmtDist(s.carry_m) + '</td>' +
       '<td>' + fmtSide(s.side_m) + '</td>' +
+      '<td>' + (s.club_path_deg != null ? (s.club_path_deg >= 0 ? '+' : '') + s.club_path_deg.toFixed(1) + String.fromCharCode(176) : '--') + '</td>' +
+      '<td>' + (s.face_angle_deg != null ? (s.face_angle_deg >= 0 ? '+' : '') + s.face_angle_deg.toFixed(1) + String.fromCharCode(176) : '--') + '</td>' +
+      '<td>' + (s.face_to_path_deg != null ? (s.face_to_path_deg >= 0 ? '+' : '') + s.face_to_path_deg.toFixed(1) + String.fromCharCode(176) : '--') + '</td>' +
+      '<td>' + (s.dynamic_loft_deg != null ? s.dynamic_loft_deg.toFixed(1) + String.fromCharCode(176) : '--') + '</td>' +
       '<td>' + (q.cls ? '<span class="pill ' + q.cls + '">' + q.label + '</span>' : '--') + '</td>';
     tbody.appendChild(tr);
   });

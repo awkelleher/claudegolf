@@ -25,6 +25,15 @@ class ClubSummary:
     # Comparison to tour benchmarks (deltas, positive = better than tour)
     carry_vs_tour_m: float | None
     smash_vs_tour: float | None
+    # --- Diagnostic fields from raw_measurement (the "why" behind the result) ---
+    club_path_deg_median: float | None        # negative = out-to-in (over the top)
+    face_angle_deg_median: float | None       # negative = closed at impact
+    face_to_path_deg_median: float | None     # face - path; the curve driver
+    dynamic_loft_deg_median: float | None     # actual loft delivered to ball
+    spin_loft_deg_median: float | None        # dynamic loft - attack angle (spin driver)
+    launch_angle_deg_median: float | None
+    impact_offset_m_stddev: float | None      # heel/toe strike consistency
+    impact_height_m_stddev: float | None      # high/low strike consistency
 
 
 @dataclass
@@ -56,6 +65,31 @@ def _safe_float(v) -> float | None:
         return None
 
 
+def _raw_series(group: pd.DataFrame, *path: str) -> pd.Series:
+    """Pull a numeric series from the nested raw_measurement jsonb column.
+
+    Example: _raw_series(group, "measurement", "ClubPath") returns each
+    shot's ClubPath as a numeric Series with NaNs dropped.
+    """
+    def get(row):
+        d = row
+        for p in path:
+            if not isinstance(d, dict):
+                return None
+            d = d.get(p)
+        return d if isinstance(d, (int, float)) else None
+
+    return group["raw_measurement"].apply(get).dropna().astype(float)
+
+
+def _median_or_none(s: pd.Series) -> float | None:
+    return float(s.median()) if len(s) else None
+
+
+def _stddev_or_none(s: pd.Series) -> float | None:
+    return float(s.std()) if len(s) > 1 else None
+
+
 def _summarize_club(club: str, group: pd.DataFrame) -> ClubSummary:
     bench = benchmark_for(club)
     carry = group["carry_m"].dropna()
@@ -65,6 +99,16 @@ def _summarize_club(club: str, group: pd.DataFrame) -> ClubSummary:
 
     carry_median = float(carry.median()) if len(carry) else None
     smash_median = float(smash.median()) if len(smash) else None
+
+    # Rich diagnostics pulled from raw_measurement.measurement / .impact_location
+    club_path = _raw_series(group, "measurement", "ClubPath")
+    face_angle = _raw_series(group, "measurement", "FaceAngle")
+    face_to_path = _raw_series(group, "measurement", "FaceToPath")
+    dynamic_loft = _raw_series(group, "measurement", "DynamicLoft")
+    spin_loft = _raw_series(group, "measurement", "SpinLoft")
+    launch_angle = _raw_series(group, "measurement", "LaunchAngle")
+    impact_off = _raw_series(group, "impact_location", "ImpactOffset")
+    impact_h = _raw_series(group, "impact_location", "ImpactHeight")
 
     return ClubSummary(
         club=club,
@@ -77,6 +121,14 @@ def _summarize_club(club: str, group: pd.DataFrame) -> ClubSummary:
         spin_rate_rpm_median=float(spin.median()) if len(spin) else None,
         carry_vs_tour_m=(carry_median - bench["carry_m"]) if (bench and carry_median is not None) else None,
         smash_vs_tour=(smash_median - bench["smash"]) if (bench and smash_median is not None) else None,
+        club_path_deg_median=_median_or_none(club_path),
+        face_angle_deg_median=_median_or_none(face_angle),
+        face_to_path_deg_median=_median_or_none(face_to_path),
+        dynamic_loft_deg_median=_median_or_none(dynamic_loft),
+        spin_loft_deg_median=_median_or_none(spin_loft),
+        launch_angle_deg_median=_median_or_none(launch_angle),
+        impact_offset_m_stddev=_stddev_or_none(impact_off),
+        impact_height_m_stddev=_stddev_or_none(impact_h),
     )
 
 
@@ -104,6 +156,34 @@ def _flag_observations(per_club: list[ClubSummary]) -> list[str]:
             flags.append(
                 f"{c.club}: carry IQR is {c.carry_m_p75 - c.carry_m_p25:.0f}m — inconsistent strike"
             )
+        # --- Rich-data diagnostics (only with adequate sample size) ---
+        if c.n_shots >= 5:
+            # Over-the-top path (out-to-in) on a driver/wood is the slice setup
+            if c.club_path_deg_median is not None and c.club_path_deg_median < -2.0 \
+               and c.club in ("Dr", "3W", "5W", "7W"):
+                flags.append(
+                    f"{c.club}: club path {c.club_path_deg_median:+.1f}° (out-to-in / over-the-top)"
+                )
+            # Face significantly closed or open
+            if c.face_angle_deg_median is not None and abs(c.face_angle_deg_median) > 3.0:
+                direction = "closed" if c.face_angle_deg_median < 0 else "open"
+                flags.append(
+                    f"{c.club}: face {c.face_angle_deg_median:+.1f}° {direction} at impact"
+                )
+            # Face-to-path divergence — the real curve driver
+            if c.face_to_path_deg_median is not None and abs(c.face_to_path_deg_median) > 3.0:
+                flags.append(
+                    f"{c.club}: face-to-path {c.face_to_path_deg_median:+.1f}° — expect curving ball flight"
+                )
+            # Strike consistency from impact location
+            if c.impact_offset_m_stddev is not None and c.impact_offset_m_stddev > 0.012:
+                flags.append(
+                    f"{c.club}: toe/heel strike inconsistent (±{c.impact_offset_m_stddev*1000:.0f}mm stddev)"
+                )
+            if c.impact_height_m_stddev is not None and c.impact_height_m_stddev > 0.010:
+                flags.append(
+                    f"{c.club}: high/low strike inconsistent (±{c.impact_height_m_stddev*1000:.0f}mm stddev)"
+                )
     return flags
 
 

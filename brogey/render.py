@@ -54,13 +54,16 @@ async function loadFromSupabase() {
   while (true) {
     const { data, error } = await sb
       .from('shots')
-      .select('shot_num,club,club_speed_mps,attack_angle_deg,ball_speed_mps,spin_rate_rpm,carry_m,side_m,smash_factor,session_id,sessions(session_date)')
+      .select('shot_num,club,club_speed_mps,attack_angle_deg,ball_speed_mps,spin_rate_rpm,carry_m,side_m,smash_factor,raw_measurement,session_id,sessions(session_date)')
       .range(from, from + PAGE - 1);
     if (error) throw error;
     if (!data || !data.length) break;
     data.forEach(row => {
       // flatten the session_date so existing code keeps working
       const sd = row.sessions ? row.sessions.session_date : null;
+      // flatten select fields from raw_measurement.measurement and impact_location
+      const m = (row.raw_measurement && row.raw_measurement.measurement) || {};
+      const imp = (row.raw_measurement && row.raw_measurement.impact_location) || {};
       RAW.push({
         session_date: sd,
         session_id: row.session_id,
@@ -73,6 +76,21 @@ async function loadFromSupabase() {
         carry_m: row.carry_m,
         side_m: row.side_m,
         smash_factor: row.smash_factor,
+        // rich diagnostics
+        club_path_deg: m.ClubPath ?? null,
+        face_angle_deg: m.FaceAngle ?? null,
+        face_to_path_deg: m.FaceToPath ?? null,
+        dynamic_loft_deg: m.DynamicLoft ?? null,
+        spin_loft_deg: m.SpinLoft ?? null,
+        launch_angle_deg: m.LaunchAngle ?? null,
+        launch_direction_deg: m.LaunchDirection ?? null,
+        spin_axis_deg: m.SpinAxis ?? null,
+        max_height_m: m.MaxHeight ?? null,
+        landing_angle_deg: m.LandingAngle ?? null,
+        hang_time_s: m.HangTime ?? null,
+        total_m: m.Total ?? null,
+        impact_offset_m: imp.ImpactOffset ?? null,
+        impact_height_m: imp.ImpactHeight ?? null,
       });
     });
     if (data.length < PAGE) break;
