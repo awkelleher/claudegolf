@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brogey</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+const SUPABASE_URL = "https://wbtizxpdfleqamlpllny.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndidGl6eHBkZmxlcWFtbHBsbG55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MzcxODgsImV4cCI6MjA5NDMxMzE4OH0.xWcw0fdnfPE3K3zMnCDrtaZyc-Ku_p1L8agl7iXrkDM";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1419;--panel:#1a2028;--panel-2:#232b35;--border:#2d3640;
+  --text:#e8ecf1;--text-dim:#8a95a3;--accent:#f97316;
+  --good:#10b981;--warn:#f59e0b;--bad:#ef4444;--blue:#3b82f6;--pink:#ec4899;
+}
+html{font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.5;padding:0 1rem 3rem}
+a{color:var(--accent)}
+h1,h2,h3{font-weight:600}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 0;border-bottom:1px solid var(--border);margin-bottom:1.25rem}
+.header h1{font-size:1.5rem;letter-spacing:-0.02em}
+.header h1 span{color:var(--accent)}
+.unit-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.unit-toggle button{background:var(--panel);color:var(--text-dim);border:none;padding:0.4rem 1rem;cursor:pointer;font-size:0.85rem;transition:all .15s}
+.unit-toggle button.active{background:var(--accent);color:#fff}
+
+/* Filters */
+.filters-bar{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.25rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start}
+.filter-group{display:flex;flex-direction:column;gap:0.35rem}
+.filter-group label.group-label{font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);font-weight:600}
+.filter-checks{display:flex;flex-wrap:wrap;gap:0.35rem}
+.filter-checks label{display:flex;align-items:center;gap:0.3rem;font-size:0.82rem;cursor:pointer;background:var(--panel-2);padding:0.25rem 0.5rem;border-radius:4px;border:1px solid var(--border);transition:all .15s;user-select:none}
+.filter-checks label:hover{border-color:var(--accent)}
+.filter-checks input[type=checkbox]{accent-color:var(--accent);cursor:pointer}
+.filter-checks label.all-toggle{font-weight:600;color:var(--accent)}
+.outlier-select{background:var(--panel-2);color:var(--text);border:1px solid var(--border);padding:0.35rem 0.5rem;border-radius:4px;font-size:0.82rem;cursor:pointer}
+.outlier-select:focus{outline:1px solid var(--accent)}
+.shot-count{margin-left:auto;font-size:0.85rem;color:var(--text-dim);align-self:center;white-space:nowrap}
+.shot-count strong{color:var(--text)}
+
+/* Club cards */
+.club-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;margin-bottom:1.25rem}
+.club-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:0.85rem 1rem;position:relative;overflow:hidden}
+.club-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.club-card .club-name{font-size:1rem;font-weight:700;margin-bottom:0.1rem}
+.club-card .club-note{font-size:0.7rem;color:var(--text-dim);font-style:italic;margin-bottom:0.25rem}
+.club-card .shot-cnt{font-size:0.75rem;color:var(--text-dim);margin-bottom:0.5rem}
+.club-card .stats{display:grid;grid-template-columns:1fr 1fr;gap:0.3rem}
+.club-card .stat{display:flex;flex-direction:column}
+.club-card .stat .label{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-dim)}
+.club-card .stat .value{font-size:0.95rem;font-weight:600}
+
+/* Charts */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem}
+@media(max-width:900px){.charts-grid{grid-template-columns:1fr}}
+.chart-panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:1rem}
+.chart-panel h3{font-size:0.9rem;margin-bottom:0.75rem;color:var(--text-dim)}
+.chart-panel canvas{width:100%!important}
+.chart-full{grid-column:1/-1}
+
+/* Tables */
+.table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.25rem;overflow-x:auto}
+.table-wrap h3{font-size:0.9rem;margin-bottom:0.75rem;color:var(--text-dim)}
+table{width:100%;border-collapse:collapse;font-size:0.82rem}
+th{text-align:left;padding:0.5rem 0.6rem;border-bottom:2px solid var(--border);color:var(--text-dim);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
+th:hover{color:var(--accent)}
+th .sort-arrow{margin-left:0.25rem;font-size:0.7rem}
+td{padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);white-space:nowrap}
+tr:hover td{background:var(--panel-2)}
+tr.dimmed td{opacity:0.4;text-decoration:line-through}
+.pill{display:inline-block;padding:0.1rem 0.45rem;border-radius:3px;font-size:0.72rem;font-weight:600}
+.pill-pure{background:rgba(16,185,129,0.15);color:var(--good)}
+.pill-good{background:rgba(245,158,11,0.15);color:var(--warn)}
+.pill-ok{background:rgba(138,149,163,0.15);color:var(--text-dim)}
+.pill-mishit{background:rgba(239,68,68,0.15);color:var(--bad)}
+.takeaway{background:var(--panel);border-left:3px solid var(--accent);padding:16px 20px;border-radius:0 8px 8px 0;margin-top:14px}
+.takeaway h4{margin:0 0 8px;color:var(--accent);font-size:14px;font-weight:600}
+.takeaway p{margin:0;font-size:14px;color:var(--text);line-height:1.7}
+.takeaway .num{color:var(--accent);font-weight:600}
+.practice-plan{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px 24px;margin-top:14px}
+.practice-plan ol{margin:0;padding-left:20px;line-height:1.8;font-size:14px}
+.practice-plan li{margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Brogey <span>&#183;</span> caddy mode</h1>
+  <div class="unit-toggle">
+    <button id="btn-imperial" class="active" onclick="setUnits('imperial')">Yards / mph</button>
+    <button id="btn-metric" onclick="setUnits('metric')">Meters / m/s</button>
+  </div>
+</div>
+
+<div class="filters-bar" id="filters-bar">
+  <div class="filter-group">
+    <label class="group-label">Session</label>
+    <select class="outlier-select" id="session-select" onchange="onSessionChange()">
+      <option value="all">All Sessions</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="group-label">Clubs</label>
+    <div class="filter-checks" id="club-filters"></div>
+  </div>
+  <div class="filter-group">
+    <label class="group-label">Outlier Filter</label>
+    <select class="outlier-select" id="outlier-mode" onchange="refresh()">
+      <option value="all">All Shots</option>
+      <option value="mishit">Hide Mishits (smash &lt; 1.0)</option>
+      <option value="iqr">IQR Filter</option>
+    </select>
+  </div>
+  <div class="shot-count" id="shot-count"></div>
+</div>
+
+<div class="club-cards" id="club-cards"></div>
+
+<div class="charts-grid">
+  <div class="chart-panel"><h3>Dispersion (Carry vs Side)</h3><canvas id="chart-dispersion"></canvas></div>
+  <div class="chart-panel"><h3>Carry by Club</h3><canvas id="chart-club-carry"></canvas></div>
+  <div class="chart-panel"><h3>Smash Factor Distribution</h3><canvas id="chart-smash"></canvas></div>
+  <div class="chart-panel"><h3>Spin Rate by Club</h3><canvas id="chart-spin"></canvas></div>
+</div>
+
+<div id="coaching-section">
+  <h2 style="font-size:1.1rem;margin:1.25rem 0 0;font-weight:600">Coaching Takeaways</h2>
+  <div id="takeaways-content"></div>
+  <h2 style="font-size:1.1rem;margin:1.25rem 0 0;font-weight:600">Suggested Practice Plan</h2>
+  <div id="practice-plan-content"></div>
+</div>
+
+<div class="table-wrap">
+  <h3>Club Averages</h3>
+  <table id="table-averages">
+    <thead><tr>
+      <th>Club</th><th># Shots</th><th>Avg Carry</th><th>Carry sigma</th><th>Avg Ball Spd</th><th>Avg Smash</th><th>Avg Spin</th><th>Avg Side</th>
+    </tr></thead>
+    <tbody id="avg-body"></tbody>
+  </table>
+</div>
+
+<div class="table-wrap">
+  <h3>Per-Shot Detail</h3>
+  <table id="table-shots">
+    <thead><tr>
+      <th data-key="session_date">Date<span class="sort-arrow"></span></th>
+      <th data-key="club">Club<span class="sort-arrow"></span></th>
+      <th data-key="shot_num">#<span class="sort-arrow"></span></th>
+      <th data-key="club_speed_mps">Club Spd<span class="sort-arrow"></span></th>
+      <th data-key="ball_speed_mps">Ball Spd<span class="sort-arrow"></span></th>
+      <th data-key="smash_factor">Smash<span class="sort-arrow"></span></th>
+      <th data-key="attack_angle_deg">AoA<span class="sort-arrow"></span></th>
+      <th data-key="spin_rate_rpm">Spin<span class="sort-arrow"></span></th>
+      <th data-key="carry_m">Carry<span class="sort-arrow"></span></th>
+      <th data-key="side_m">Side<span class="sort-arrow"></span></th>
+      <th>Quality</th>
+    </tr></thead>
+    <tbody id="shots-body"></tbody>
+  </table>
+</div>
+
+<script>
+
+// === Brogey/Supabase data layer (injected) ===
+let BROGEY_INSIGHTS = [];   // rows from `insights` table, newest first
+
+async function loadFromSupabase() {
+  // Pull shots joined with session_date.
+  // Use range pagination to be safe if/when we exceed 1k rows.
+  const PAGE = 1000;
+  let from = 0;
+  const all = [];
+  while (true) {
+    const { data, error } = await sb
+      .from('shots')
+      .select('shot_num,club,club_speed_mps,attack_angle_deg,ball_speed_mps,spin_rate_rpm,carry_m,side_m,smash_factor,session_id,sessions(session_date)')
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data || !data.length) break;
+    data.forEach(row => {
+      // flatten the session_date so existing code keeps working
+      const sd = row.sessions ? row.sessions.session_date : null;
+      RAW.push({
+        session_date: sd,
+        session_id: row.session_id,
+        shot_num: row.shot_num,
+        club: row.club,
+        club_speed_mps: row.club_speed_mps,
+        attack_angle_deg: row.attack_angle_deg,
+        ball_speed_mps: row.ball_speed_mps,
+        spin_rate_rpm: row.spin_rate_rpm,
+        carry_m: row.carry_m,
+        side_m: row.side_m,
+        smash_factor: row.smash_factor,
+      });
+    });
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  // Insights: latest per session
+  const { data: ins } = await sb
+    .from('insights')
+    .select('id,session_id,headline,body,created_at,sessions(session_date)')
+    .eq('scope', 'session')
+    .order('created_at', { ascending: false });
+  BROGEY_INSIGHTS = ins || [];
+}
+
+async function init() {
+  document.getElementById('shot-count').innerHTML = 'Loading from Supabase\u2026';
+  try {
+    await loadFromSupabase();
+  } catch (e) {
+    document.getElementById('shot-count').innerHTML =
+      '<span style="color:var(--bad)">Failed to load: ' + (e.message || e) + '</span>';
+    console.error(e);
+    return;
+  }
+
+  // Same one-pass computations that used to run at top level.
+  RAW.forEach(s => {
+    if (s.smash_factor == null && s.ball_speed_mps != null && s.club_speed_mps != null && s.club_speed_mps > 0) {
+      s.smash_factor = +(s.ball_speed_mps / s.club_speed_mps).toFixed(3);
+    }
+  });
+
+  allDates = [...new Set(RAW.map(s => s.session_date))].sort();
+  allClubs = [...new Set(RAW.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+  selectedDates = new Set(allDates);
+  selectedClubs = new Set(allClubs);
+
+  // Populate session dropdown
+  const sel = document.getElementById('session-select');
+  // Clear any prior options (in case of re-init)
+  Array.from(sel.querySelectorAll('option')).forEach(o => { if (o.value !== 'all') o.remove(); });
+  allDates.slice().reverse().forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = d;
+    sel.appendChild(opt);
+  });
+
+  // Build club checkboxes
+  document.getElementById('club-filters').innerHTML = '';
+  buildChecks('club-filters', allClubs, selectedClubs, CLUB_COLORS);
+
+  refresh();
+}
+
+// Override the auto-generated takeaways with Brogey's persisted insights.
+function renderInsightsFromBrogey(shots) {
+  const twEl = document.getElementById('takeaways-content');
+  const ppEl = document.getElementById('practice-plan-content');
+
+  // Filter Brogey insights to currently selected sessions.
+  const visible = BROGEY_INSIGHTS.filter(ins => {
+    const d = ins.sessions ? ins.sessions.session_date : null;
+    return d && selectedDates.has(d);
+  });
+
+  if (!visible.length) {
+    twEl.innerHTML =
+      '<p style="color:var(--text-dim);font-size:14px;margin-top:10px">' +
+      'No Brogey insights yet for this selection. Run <code>brogey coach</code> on a session to generate one.</p>';
+    ppEl.innerHTML = '';
+    return;
+  }
+
+  // Render most-recent first.
+  const takeawayHtml = [];
+  const drillHtml = [];
+  visible.forEach(ins => {
+    const body = ins.body || {};
+    const date = ins.sessions ? ins.sessions.session_date : '';
+    takeawayHtml.push(
+      '<div class="takeaway" style="margin-top:18px">' +
+        '<h4>' + (ins.headline || 'Brogey says') + ' <span style="color:var(--text-dim);font-weight:400">\u00b7 ' + date + '</span></h4>'
+    );
+    (body.takeaways || []).forEach((t, i) => {
+      takeawayHtml.push(
+        '<p style="margin-top:8px"><strong>' + (i + 1) + '. ' + (t.title || '') + '</strong><br>' +
+        (t.detail || '') + '</p>'
+      );
+    });
+    takeawayHtml.push('</div>');
+
+    if (body.practice_plan && body.practice_plan.length) {
+      drillHtml.push(
+        '<div class="practice-plan" style="margin-top:18px">' +
+        '<div style="color:var(--text-dim);font-size:12px;margin-bottom:6px">Drills from ' + date + '</div>' +
+        '<ol>'
+      );
+      body.practice_plan.forEach(d => {
+        drillHtml.push(
+          '<li><strong>' + (d.name || '') + '</strong> &mdash; ' +
+          (d.how || '') +
+          ' <span style="color:var(--text-dim)">(' + (d.why || '') + ')</span></li>'
+        );
+      });
+      drillHtml.push('</ol>');
+      if (body.next_session_focus) {
+        drillHtml.push(
+          '<p style="margin-top:10px;color:var(--text-dim);font-size:13px">' +
+          '<strong style="color:var(--accent)">Next session:</strong> ' + body.next_session_focus + '</p>'
+        );
+      }
+      drillHtml.push('</div>');
+    }
+  });
+
+  twEl.innerHTML = takeawayHtml.join('');
+  ppEl.innerHTML = drillHtml.join('');
+}
+
+const M_TO_YD = 1.0936133;
+const MPS_TO_MPH = 2.2369363;
+const CLUB_ORDER = ['Dr','5W','5i','7i','8i','PW','SW','Unknown'];
+const CLUB_COLORS = {Dr:'#f97316','5W':'#3b82f6','5i':'#ec4899','7i':'#06b6d4','8i':'#10b981',PW:'#f59e0b',SW:'#ef4444',Unknown:'#6b7280'};
+
+const TOUR_CARRY_M = {Dr:256,  '5W':224, '5i':192, '7i':165, '8i':152, PW:128, SW:98};
+const SCRATCH_CARRY_M = {Dr:229, '5W':201, '5i':174, '7i':150, '8i':137, PW:114, SW:88};
+const TOUR_SPIN = {Dr:2700, '5W':3500, '5i':5000, '7i':7000, '8i':8000, PW:9300, SW:10000};
+const SCRATCH_SPIN = {Dr:3100, '5W':4000, '5i':5500, '7i':7200, '8i':8300, PW:9500, SW:10200};
+
+let units = 'imperial';
+let sortKey = 'session_date';
+let sortDir = 1;
+let chartDispersion, chartSession, chartSmash, chartSpin;
+
+let RAW = [];
+
+
+// Extract unique dates and clubs
+let allDates = [];
+let allClubs = [];
+
+let selectedDates = new Set(allDates);
+let selectedClubs = new Set(allClubs);
+
+// --- Build filter checkboxes ---
+function buildChecks(containerId, items, selectedSet, colorMap) {
+  const el = document.getElementById(containerId);
+  // All toggle
+  const allLbl = document.createElement('label');
+  allLbl.className = 'all-toggle';
+  const allCb = document.createElement('input');
+  allCb.type = 'checkbox';
+  allCb.checked = true;
+  allCb.addEventListener('change', () => {
+    const checks = el.querySelectorAll('input[type=checkbox]:not(:first-of-type)');
+    checks.forEach(c => { c.checked = allCb.checked; });
+    if (allCb.checked) items.forEach(i => selectedSet.add(i)); else selectedSet.clear();
+    refresh();
+  });
+  allLbl.appendChild(allCb);
+  allLbl.appendChild(document.createTextNode('All'));
+  el.appendChild(allLbl);
+
+  items.forEach(item => {
+    const lbl = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.addEventListener('change', () => {
+      if (cb.checked) selectedSet.add(item); else selectedSet.delete(item);
+      refresh();
+    });
+    lbl.appendChild(cb);
+    const txt = item === 'Unknown' ? 'Unknown*' : item;
+    lbl.appendChild(document.createTextNode(txt));
+    if (colorMap && colorMap[item]) {
+      lbl.style.borderLeftColor = colorMap[item];
+      lbl.style.borderLeftWidth = '3px';
+    }
+    el.appendChild(lbl);
+  });
+}
+function onSessionChange() {
+  const val = document.getElementById('session-select').value;
+  if (val === 'all') { selectedDates = new Set(allDates); }
+  else { selectedDates = new Set([val]); }
+  refresh();
+}
+
+// --- Conversion helpers ---
+function convDist(m) { return units === 'imperial' ? m * M_TO_YD : m; }
+function convSpd(mps) { return units === 'imperial' ? mps * MPS_TO_MPH : mps; }
+function fmtDist(m) { if (m == null) return '--'; return convDist(m).toFixed(1); }
+function fmtSpd(mps) { if (mps == null) return '--'; return convSpd(mps).toFixed(1); }
+function fmtSide(m) {
+  if (m == null) return '--';
+  const v = convDist(Math.abs(m));
+  return v.toFixed(1) + (m >= 0 ? 'R' : 'L');
+}
+function distUnit() { return units === 'imperial' ? 'yd' : 'm'; }
+function spdUnit() { return units === 'imperial' ? 'mph' : 'm/s'; }
+
+function qualityTier(sf) {
+  if (sf == null) return { label: '--', cls: '' };
+  if (sf >= 1.42) return { label: 'Pure', cls: 'pill-pure' };
+  if (sf >= 1.30) return { label: 'Good', cls: 'pill-good' };
+  if (sf >= 1.0)  return { label: 'OK',   cls: 'pill-ok' };
+  return { label: 'Mishit', cls: 'pill-mishit' };
+}
+
+// --- IQR computation ---
+function computeIQRBounds() {
+  const bounds = {};
+  allClubs.forEach(club => {
+    const carries = RAW.filter(s => s.club === club && s.carry_m != null).map(s => s.carry_m).sort((a,b) => a - b);
+    if (carries.length < 4) { bounds[club] = null; return; }
+    const q1 = carries[Math.floor(carries.length * 0.25)];
+    const q3 = carries[Math.floor(carries.length * 0.75)];
+    const iqr = q3 - q1;
+    bounds[club] = { lo: q1 - 1.5 * iqr, hi: q3 + 1.5 * iqr };
+  });
+  return bounds;
+}
+
+function getFilteredData() {
+  const mode = document.getElementById('outlier-mode').value;
+  const iqrBounds = mode === 'iqr' ? computeIQRBounds() : null;
+
+  return RAW.filter(s => selectedDates.has(s.session_date) && selectedClubs.has(s.club)).map(s => {
+    let filtered = false;
+    if (mode === 'mishit' && s.smash_factor != null && s.smash_factor < 1.0) filtered = true;
+    if (mode === 'iqr' && iqrBounds[s.club] && s.carry_m != null) {
+      const b = iqrBounds[s.club];
+      if (s.carry_m < b.lo || s.carry_m > b.hi) filtered = true;
+    }
+    return { ...s, _filtered: filtered };
+  });
+}
+
+function avg(arr) { if (!arr.length) return null; return arr.reduce((a,b) => a + b, 0) / arr.length; }
+function stddev(arr) {
+  if (arr.length < 2) return null;
+  const m = avg(arr);
+  return Math.sqrt(arr.reduce((s, v) => s + (v - m) * (v - m), 0) / (arr.length - 1));
+}
+
+// --- Set units ---
+function setUnits(u) {
+  units = u;
+  document.getElementById('btn-imperial').classList.toggle('active', u === 'imperial');
+  document.getElementById('btn-metric').classList.toggle('active', u === 'metric');
+  refresh();
+}
+
+// --- Main refresh ---
+function refresh() {
+  const data = getFilteredData();
+  const active = data.filter(s => !s._filtered);
+  const filteredCount = data.filter(s => s._filtered).length;
+
+  // Shot count
+  document.getElementById('shot-count').innerHTML =
+    'Showing <strong>' + active.length + '</strong> of ' + data.length + ' shots' +
+    (filteredCount ? ' (' + filteredCount + ' filtered)' : '');
+
+  renderCards(active);
+  renderDispersion(active);
+  renderClubCarryChart(active);
+  renderSmashChart(active);
+  renderSpinChart(active);
+  renderInsightsFromBrogey(active);
+  renderAveragesTable(active);
+  renderShotsTable(data);
+}
+
+// --- Coaching Takeaways & Practice Plan ---
+function renderInsights(shots) {
+  const twEl = document.getElementById('takeaways-content');
+  const ppEl = document.getElementById('practice-plan-content');
+  const known = shots.filter(s => s.club !== 'Unknown');
+  if (known.length < 5) {
+    twEl.innerHTML = '<p style="color:var(--text-dim);font-size:14px;margin-top:10px">Not enough data to generate takeaways.</p>';
+    ppEl.innerHTML = '';
+    return;
+  }
+
+  const clubs = [...new Set(known.map(s => s.club))].sort((a,b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+
+  const clubStats = {};
+  clubs.forEach(c => {
+    const cs = known.filter(s => s.club === c);
+    const carries = cs.map(s => s.carry_m).filter(v => v != null);
+    const sides = cs.map(s => s.side_m).filter(v => v != null);
+    const smashes = cs.map(s => s.smash_factor).filter(v => v != null);
+    const spins = cs.map(s => s.spin_rate_rpm).filter(v => v != null);
+    const cleanCarries = cs.filter(s => s.smash_factor != null && s.smash_factor >= 1.0 && s.carry_m != null).map(s => s.carry_m);
+    const mishits = smashes.filter(v => v < 1.0);
+    clubStats[c] = {
+      n: cs.length,
+      avgCarry: avg(carries), carrySigma: carries.length >= 2 ? stddev(carries) : null,
+      avgSide: avg(sides), sideSigma: sides.length >= 2 ? stddev(sides) : null,
+      avgSmash: avg(smashes), avgSpin: avg(spins),
+      cleanAvgCarry: avg(cleanCarries), cleanN: cleanCarries.length,
+      mishitN: mishits.length, mishitPct: smashes.length ? mishits.length / smashes.length * 100 : 0
+    };
+  });
+
+  const takeaways = [];
+  let num = 1;
+
+  // Find most reliable club (lowest carry sigma)
+  const reliableClubs = clubs.filter(c => clubStats[c].carrySigma != null && clubStats[c].n >= 5);
+  if (reliableClubs.length) {
+    const best = reliableClubs.sort((a,b) => clubStats[a].carrySigma - clubStats[b].carrySigma)[0];
+    const s = clubStats[best];
+    takeaways.push({
+      title: num++ + '. The ' + best + ' is your most reliable club right now',
+      body: best + ' carry standard deviation is <span class="num">' + fmtDist(s.carrySigma) + ' ' + distUnit() + '</span>. ' +
+        'Direction averages <span class="num">' + fmtSide(s.avgSide) + '</span> with a side sigma of ' + fmtDist(s.sideSigma) + ' ' + distUnit() + '. ' +
+        (s.mishitN === 0 ? 'Zero mishits — pure consistency.' : 'Only ' + s.mishitN + ' mishit' + (s.mishitN > 1 ? 's' : '') + ' out of ' + s.n + ' shots.') +
+        ' Use it as your stock club for any shot where you need to hit a number.'
+    });
+  }
+
+  // Find worst contact club
+  const contactClubs = clubs.filter(c => clubStats[c].avgSmash != null && clubStats[c].n >= 5);
+  if (contactClubs.length) {
+    const worst = contactClubs.sort((a,b) => clubStats[a].avgSmash - clubStats[b].avgSmash)[0];
+    const s = clubStats[worst];
+    if (s.mishitPct > 10) {
+      takeaways.push({
+        title: num++ + '. ' + worst + ' strike consistency is the leak',
+        body: 'When you make clean contact (' + s.cleanN + ' of ' + s.n + ' shots), ' + worst + ' carries an average of <span class="num">' + fmtDist(s.cleanAvgCarry) + ' ' + distUnit() + '</span> at <span class="num">' + (s.avgSmash >= 1.0 ? s.avgSmash.toFixed(2) : '--') + '</span> avg smash. ' +
+          'But <span class="num">' + s.mishitN + '</span> of ' + s.n + ' shots had smash factors under 1.0, dragging your raw average down to ' + fmtDist(s.avgCarry) + ' ' + distUnit() + '. Strike rate, not speed, is the gap.'
+      });
+    }
+  }
+
+  // Worst dispersion club
+  const dispClubs = clubs.filter(c => clubStats[c].sideSigma != null && clubStats[c].n >= 5);
+  if (dispClubs.length) {
+    const worst = dispClubs.sort((a,b) => clubStats[b].sideSigma - clubStats[a].sideSigma)[0];
+    const s = clubStats[worst];
+    if (s.sideSigma > 15) {
+      const dir = s.avgSide < -3 ? 'pulls left' : s.avgSide > 3 ? 'pushes right' : 'sprays both ways';
+      takeaways.push({
+        title: num++ + '. ' + worst + ' ' + dir + ' — direction work needed',
+        body: 'Average ' + worst + ' side: <span class="num">' + fmtSide(s.avgSide) + '</span>. Your side dispersion ' + String.fromCharCode(963) + ' is <span class="num">' + fmtDist(s.sideSigma) + ' ' + distUnit() + '</span>. ' +
+          (s.avgSpin > 4000 && (worst === 'Dr' || worst === '5W') ?
+            'The pattern combined with high spin (<span class="num">' + Math.round(s.avgSpin).toLocaleString() + '</span> rpm) suggests an over-the-top delivery — face closing through impact + steep attack angle. Worth filming to confirm.' :
+            'Focus on consistent face angle and swing path. Alignment stick drills and face-tape checks will help isolate the cause.')
+      });
+    }
+  }
+
+  // Spin check on woods/driver
+  clubs.forEach(c => {
+    if (c !== 'Dr' && c !== '5W') return;
+    const s = clubStats[c];
+    if (!s || s.n < 3 || !s.avgSpin) return;
+    const ideal = c === 'Dr' ? [2000, 3000] : [2500, 3500];
+    if (s.avgSpin > ideal[1] + 500) {
+      takeaways.push({
+        title: num++ + '. ' + c + ' spin is too high — losing distance',
+        body: c + ' spin averages <span class="num">' + Math.round(s.avgSpin).toLocaleString() + '</span> rpm vs. the ' + ideal[0].toLocaleString() + '–' + ideal[1].toLocaleString() + ' rpm ideal range. ' +
+          'High spin causes the ball to balloon and lose carry. Try hitting more up on it (positive attack angle) and check your tee height. A more neutral face-to-path also helps reduce spin loft.'
+      });
+    }
+  });
+
+  // Spin check on irons (too low)
+  clubs.forEach(c => {
+    if (c === 'Dr' || c === '5W' || c === 'SW') return;
+    const s = clubStats[c];
+    if (!s || s.n < 3 || !s.avgSpin) return;
+    const idealLo = c === '5i' ? 5000 : c === '7i' ? 5500 : c === '8i' ? 6000 : c === 'PW' ? 7000 : 5000;
+    if (s.avgSpin < idealLo * 0.8) {
+      takeaways.push({
+        title: num++ + '. ' + c + ' spin is a touch low — possible thin strike pattern',
+        body: c + ' spin averages <span class="num">' + Math.round(s.avgSpin).toLocaleString() + '</span> rpm vs. a typical range of ' + idealLo.toLocaleString() + '+ rpm for that loft. ' +
+          'Ball speed is solid when you find the center, but lower spin generally means thin contact (impact below center) or delofted face. Worth a face-tape check next session.'
+      });
+    }
+  });
+
+  // Overall mishit rate
+  const allSmash = known.filter(s => s.smash_factor != null);
+  const allMishits = allSmash.filter(s => s.smash_factor < 1.0);
+  if (allSmash.length >= 10 && allMishits.length / allSmash.length > 0.08) {
+    takeaways.push({
+      title: num++ + '. Overall mishit rate needs attention',
+      body: '<span class="num">' + allMishits.length + '</span> of ' + allSmash.length + ' total shots (' + (allMishits.length / allSmash.length * 100).toFixed(1) + '%) had a smash factor under 1.0. ' +
+        'Tour average is around 3–5%. Focus on center-face contact across all clubs — strike quality is the biggest lever for distance consistency.'
+    });
+  }
+
+  twEl.innerHTML = takeaways.length
+    ? takeaways.map(t => '<div class="takeaway"><h4>' + t.title + '</h4><p>' + t.body + '</p></div>').join('')
+    : '<p style="color:var(--text-dim);font-size:14px;margin-top:10px">Not enough data to generate takeaways.</p>';
+
+  // Practice plan
+  const drills = [];
+  const worstStrike = contactClubs.length ? contactClubs.sort((a,b) => clubStats[a].avgSmash - clubStats[b].avgSmash)[0] : null;
+  const bestClub = reliableClubs.length ? reliableClubs.sort((a,b) => clubStats[a].carrySigma - clubStats[b].carrySigma)[0] : null;
+  const worstDisp = dispClubs.length ? dispClubs.sort((a,b) => clubStats[b].sideSigma - clubStats[a].sideSigma)[0] : null;
+
+  if (worstStrike && clubStats[worstStrike].mishitPct > 10) {
+    drills.push('<strong>Strike-first ' + worstStrike + ' block (15 balls):</strong> ' +
+      (worstStrike === 'Dr' || worstStrike === '5W'
+        ? 'Tee a ball low and put a tee 2 inches in front of the ball. Make passes that brush both. The goal is shallow, low-point control. Don\'t worry about distance; chase center contact.'
+        : 'Hit half-swing shots focusing purely on center-face contact. Use face tape if available. Build up to full swings only after 5 consecutive center strikes.'));
+  }
+
+  if (bestClub) {
+    drills.push('<strong>' + bestClub + ' confidence block (10 balls):</strong> Pick a target line, lay a club on the ground, and hit shots at 80% effort. Prove to yourself that your stock ' + bestClub + ' is repeatable. Expect every ball to start within 5 yards of the line.');
+  }
+
+  if (worstStrike && bestClub && worstStrike !== bestClub) {
+    const baseline = clubStats[worstStrike].cleanAvgCarry;
+    drills.push('<strong>Mixed gapping block (10 balls):</strong> Alternate ' + bestClub + ' and ' + worstStrike + '. Goal: every ' + worstStrike + ' must carry ' + (baseline ? fmtDist(baseline * 0.9) + '+ ' + distUnit() : 'your clean-shot baseline') + '. Walk away from the bay if you can\'t string 3 in a row.');
+  }
+
+  if (worstDisp) {
+    drills.push('<strong>Diagnostic priority:</strong> Next session, ask Trackman for Club Path and Face-to-Path on ' + worstDisp + '. Understanding path vs. face will let you prescribe the right fix — alignment work vs. swing path change.');
+  }
+
+  ppEl.innerHTML = drills.length
+    ? '<div class="practice-plan"><ol>' + drills.map(d => '<li>' + d + '</li>').join('') + '</ol></div>'
+    : '';
+}
+
+// --- Club Cards ---
+function renderCards(shots) {
+  const el = document.getElementById('club-cards');
+  el.innerHTML = '';
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  clubs.forEach(club => {
+    const cs = shots.filter(s => s.club === club);
+    const carries = cs.map(s => s.carry_m).filter(v => v != null);
+    const ballSpeeds = cs.map(s => s.ball_speed_mps).filter(v => v != null && v > 0);
+    const smashes = cs.map(s => s.smash_factor).filter(v => v != null);
+    const sides = cs.map(s => s.side_m).filter(v => v != null);
+    const spins = cs.map(s => s.spin_rate_rpm).filter(v => v != null);
+    const color = CLUB_COLORS[club] || '#6b7280';
+
+    const card = document.createElement('div');
+    card.className = 'club-card';
+    card.style.cssText = '--c:' + color;
+    card.querySelector; // force style
+    card.innerHTML =
+      '<style>.club-card[style*="--c:' + color + '"]::before{background:' + color + '}</style>' +
+      '<div class="club-name" style="color:' + color + '">' + club + '</div>' +
+      (club === 'Unknown' ? '<div class="club-note">Club not set on Trackman</div>' : '') +
+      '<div class="shot-cnt">' + cs.length + ' shots</div>' +
+      '<div class="stats">' +
+        stat('Avg Carry', fmtDist(avg(carries)) + ' ' + distUnit()) +
+        stat('Avg Ball Spd', fmtSpd(avg(ballSpeeds)) + ' ' + spdUnit()) +
+        stat('Avg Smash', smashes.length ? avg(smashes).toFixed(3) : '--') +
+        stat('Carry ' + String.fromCharCode(963), carries.length >= 2 ? fmtDist(stddev(carries)) + ' ' + distUnit() : '--') +
+        stat('Avg Side', sides.length ? fmtSide(avg(sides)) : '--') +
+        stat('Avg Spin', spins.length ? Math.round(avg(spins)).toLocaleString() + ' rpm' : '--') +
+      '</div>';
+    el.appendChild(card);
+  });
+}
+function stat(label, value) {
+  return '<div class="stat"><span class="label">' + label + '</span><span class="value">' + value + '</span></div>';
+}
+
+// --- Dispersion Chart ---
+function renderDispersion(shots) {
+  const ctx = document.getElementById('chart-dispersion').getContext('2d');
+  if (chartDispersion) chartDispersion.destroy();
+
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const datasets = clubs.map(club => {
+    const pts = shots.filter(s => s.club === club && s.carry_m != null && s.side_m != null);
+    return {
+      label: club,
+      data: pts.map(s => ({ x: convDist(s.carry_m), y: convDist(s.side_m), _raw: s })),
+      backgroundColor: (CLUB_COLORS[club] || '#6b7280') + 'cc',
+      borderColor: CLUB_COLORS[club] || '#6b7280',
+      borderWidth: 1,
+      pointRadius: 5,
+      pointHoverRadius: 7
+    };
+  });
+
+  chartDispersion = new Chart(ctx, {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#8a95a3', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(c) {
+              const s = c.raw._raw;
+              return s.club + ' #' + s.shot_num + ' | Carry: ' + fmtDist(s.carry_m) + ' ' + distUnit() +
+                     ' | Side: ' + fmtSide(s.side_m) +
+                     (s.smash_factor != null ? ' | Smash: ' + s.smash_factor.toFixed(3) : '');
+            }
+          }
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Carry (' + distUnit() + ')', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } },
+        y: { title: { display: true, text: 'Side (' + distUnit() + ')', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } }
+      }
+    }
+  });
+}
+
+// --- Carry by Club Chart ---
+function renderClubCarryChart(shots) {
+  const ctx = document.getElementById('chart-club-carry').getContext('2d');
+  if (chartSession) chartSession.destroy();
+
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const avgCarries = clubs.map(club => {
+    const carries = shots.filter(s => s.club === club && s.carry_m != null).map(s => s.carry_m);
+    return carries.length ? convDist(avg(carries)) : 0;
+  });
+  const sigmas = clubs.map(club => {
+    const carries = shots.filter(s => s.club === club && s.carry_m != null).map(s => s.carry_m);
+    return carries.length >= 2 ? convDist(stddev(carries)) : 0;
+  });
+
+  const tourCarry = clubs.map(c => TOUR_CARRY_M[c] != null ? convDist(TOUR_CARRY_M[c]) : null);
+  const scratchCarry = clubs.map(c => SCRATCH_CARRY_M[c] != null ? convDist(SCRATCH_CARRY_M[c]) : null);
+
+  chartSession = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: clubs,
+      datasets: [{
+        label: 'Your Avg Carry',
+        data: avgCarries,
+        backgroundColor: clubs.map(c => (CLUB_COLORS[c] || '#6b7280') + 'cc'),
+        borderColor: clubs.map(c => CLUB_COLORS[c] || '#6b7280'),
+        borderWidth: 1,
+        order: 2
+      },{
+        label: 'Tour Avg',
+        data: tourCarry,
+        type: 'line',
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16,185,129,0.1)',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 4,
+        pointBackgroundColor: '#10b981',
+        fill: false,
+        order: 0
+      },{
+        label: 'Scratch Avg',
+        data: scratchCarry,
+        type: 'line',
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245,158,11,0.1)',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 4,
+        pointBackgroundColor: '#f59e0b',
+        fill: false,
+        order: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#8a95a3', font: { size: 11 } } } },
+      scales: {
+        x: { grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } },
+        y: { title: { display: true, text: 'Carry (' + distUnit() + ')', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } }
+      }
+    }
+  });
+}
+
+// --- Smash Factor Chart ---
+function renderSmashChart(shots) {
+  const ctx = document.getElementById('chart-smash').getContext('2d');
+  if (chartSmash) chartSmash.destroy();
+
+  const withSmash = shots.filter(s => s.smash_factor != null);
+  const colors = withSmash.map(s => {
+    if (s.smash_factor >= 1.42) return '#10b981';
+    if (s.smash_factor >= 1.30) return '#f59e0b';
+    if (s.smash_factor >= 1.0) return '#8a95a3';
+    return '#ef4444';
+  });
+
+  chartSmash = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: withSmash.map((s, i) => s.club + ' #' + s.shot_num),
+      datasets: [{
+        data: withSmash.map(s => s.smash_factor),
+        backgroundColor: colors,
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(c) {
+              const s = withSmash[c.dataIndex];
+              return s.session_date + ' | ' + s.club + ' #' + s.shot_num + ' | Smash: ' + s.smash_factor.toFixed(3);
+            }
+          }
+        }
+      },
+      scales: {
+        x: { display: false },
+        y: { title: { display: true, text: 'Smash Factor', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' },
+          suggestedMin: 0.5, suggestedMax: 1.6 }
+      }
+    }
+  });
+}
+
+// --- Spin Rate Chart ---
+function renderSpinChart(shots) {
+  const ctx = document.getElementById('chart-spin').getContext('2d');
+  if (chartSpin) chartSpin.destroy();
+
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const avgSpins = clubs.map(club => {
+    const spins = shots.filter(s => s.club === club && s.spin_rate_rpm != null).map(s => s.spin_rate_rpm);
+    return spins.length ? avg(spins) : 0;
+  });
+
+  const tourSpin = clubs.map(c => TOUR_SPIN[c] != null ? TOUR_SPIN[c] : null);
+  const scratchSpin = clubs.map(c => SCRATCH_SPIN[c] != null ? SCRATCH_SPIN[c] : null);
+
+  chartSpin = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: clubs,
+      datasets: [{
+        label: 'Your Avg Spin',
+        data: avgSpins,
+        backgroundColor: clubs.map(c => (CLUB_COLORS[c] || '#6b7280') + 'cc'),
+        borderColor: clubs.map(c => CLUB_COLORS[c] || '#6b7280'),
+        borderWidth: 1,
+        order: 2
+      },{
+        label: 'Tour Avg',
+        data: tourSpin,
+        type: 'line',
+        borderColor: '#10b981',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 4,
+        pointBackgroundColor: '#10b981',
+        fill: false,
+        order: 0
+      },{
+        label: 'Scratch Avg',
+        data: scratchSpin,
+        type: 'line',
+        borderColor: '#f59e0b',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 4,
+        pointBackgroundColor: '#f59e0b',
+        fill: false,
+        order: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#8a95a3', font: { size: 11 } } } },
+      scales: {
+        x: { grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } },
+        y: { title: { display: true, text: 'Avg Spin (rpm)', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } }
+      }
+    }
+  });
+}
+
+// --- Club Averages Table ---
+function renderAveragesTable(shots) {
+  const tbody = document.getElementById('avg-body');
+  tbody.innerHTML = '';
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  clubs.forEach(club => {
+    const cs = shots.filter(s => s.club === club);
+    const carries = cs.map(s => s.carry_m).filter(v => v != null);
+    const ballSpeeds = cs.map(s => s.ball_speed_mps).filter(v => v != null && v > 0);
+    const smashes = cs.map(s => s.smash_factor).filter(v => v != null);
+    const spins = cs.map(s => s.spin_rate_rpm).filter(v => v != null);
+    const sides = cs.map(s => s.side_m).filter(v => v != null);
+    const color = CLUB_COLORS[club] || '#6b7280';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td style="color:' + color + ';font-weight:600">' + club + (club === 'Unknown' ? '*' : '') + '</td>' +
+      '<td>' + cs.length + '</td>' +
+      '<td>' + fmtDist(avg(carries)) + ' ' + distUnit() + '</td>' +
+      '<td>' + (carries.length >= 2 ? fmtDist(stddev(carries)) : '--') + '</td>' +
+      '<td>' + fmtSpd(avg(ballSpeeds)) + ' ' + spdUnit() + '</td>' +
+      '<td>' + (smashes.length ? avg(smashes).toFixed(3) : '--') + '</td>' +
+      '<td>' + (spins.length ? Math.round(avg(spins)).toLocaleString() : '--') + '</td>' +
+      '<td>' + (sides.length ? fmtSide(avg(sides)) : '--') + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// --- Per-Shot Detail Table ---
+function renderShotsTable(data) {
+  const sorted = [...data].sort((a, b) => {
+    let va = a[sortKey], vb = b[sortKey];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (sortKey === 'session_date' || sortKey === 'club') {
+      if (sortKey === 'club') {
+        va = CLUB_ORDER.indexOf(va); if (va === -1) va = 99;
+        vb = CLUB_ORDER.indexOf(vb); if (vb === -1) vb = 99;
+      }
+      return va < vb ? -sortDir : va > vb ? sortDir : 0;
+    }
+    return (va - vb) * sortDir;
+  });
+
+  const tbody = document.getElementById('shots-body');
+  tbody.innerHTML = '';
+
+  sorted.forEach(s => {
+    const q = qualityTier(s.smash_factor);
+    const tr = document.createElement('tr');
+    if (s._filtered) tr.className = 'dimmed';
+    tr.innerHTML =
+      '<td>' + s.session_date + '</td>' +
+      '<td style="color:' + (CLUB_COLORS[s.club] || '#6b7280') + '">' + s.club + '</td>' +
+      '<td>' + s.shot_num + '</td>' +
+      '<td>' + fmtSpd(s.club_speed_mps) + '</td>' +
+      '<td>' + fmtSpd(s.ball_speed_mps) + '</td>' +
+      '<td>' + (s.smash_factor != null ? s.smash_factor.toFixed(3) : '--') + '</td>' +
+      '<td>' + (s.attack_angle_deg != null ? s.attack_angle_deg.toFixed(1) + String.fromCharCode(176) : '--') + '</td>' +
+      '<td>' + (s.spin_rate_rpm != null ? s.spin_rate_rpm.toLocaleString() : '--') + '</td>' +
+      '<td>' + fmtDist(s.carry_m) + '</td>' +
+      '<td>' + fmtSide(s.side_m) + '</td>' +
+      '<td>' + (q.cls ? '<span class="pill ' + q.cls + '">' + q.label + '</span>' : '--') + '</td>';
+    tbody.appendChild(tr);
+  });
+
+  // Update sort arrows
+  document.querySelectorAll('#table-shots th[data-key]').forEach(th => {
+    const arrow = th.querySelector('.sort-arrow');
+    if (th.dataset.key === sortKey) {
+      arrow.textContent = sortDir === 1 ? ' ▲' : ' ▼';
+    } else {
+      arrow.textContent = '';
+    }
+  });
+}
+
+// Sort handler
+document.querySelectorAll('#table-shots th[data-key]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = 1; }
+    refresh();
+  });
+});
+
+// Initial render
+init();
+</script>
+</body>
+</html>

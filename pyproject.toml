@@ -1,0 +1,26 @@
+[project]
+name = "brogey"
+version = "0.1.0"
+description = "AI golf caddy that ingests range and round data and coaches you in Brogey's voice."
+requires-python = ">=3.11"
+dependencies = [
+    "supabase>=2.9.0",
+    "python-dotenv>=1.0.1",
+    "pandas>=2.2.0",
+    "pypdf>=4.3.0",
+    "pdfplumber>=0.11.0",
+    "jinja2>=3.1.4",
+    "anthropic>=0.39.0",
+    "click>=8.1.7",
+]
+
+[project.scripts]
+brogey = "brogey.cli:cli"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["brogey*"]

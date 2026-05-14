@@ -1,0 +1,17 @@
+.env
+.env.local
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+data/incoming/
+.claude/
+.DS_Store
+Thumbs.db
