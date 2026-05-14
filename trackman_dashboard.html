@@ -130,6 +130,14 @@ tr.dimmed td{opacity:0.4;text-decoration:line-through}
   <div class="chart-panel"><h3>Carry by Club</h3><canvas id="chart-club-carry"></canvas></div>
   <div class="chart-panel"><h3>Average Smash by Club</h3><canvas id="chart-smash"></canvas></div>
   <div class="chart-panel"><h3>Spin Rate by Club</h3><canvas id="chart-spin"></canvas></div>
+  <div class="chart-panel chart-full"><h3>Gapping (median carry per club, with gap deltas)</h3><canvas id="chart-gapping"></canvas></div>
+  <div class="chart-panel chart-full">
+    <h3 style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
+      <span>Carry Trend Over Time (median per session, by club)</span>
+      <span style="font-size:0.72rem;color:var(--text-dim);font-weight:400">All sessions — ignores session filter above</span>
+    </h3>
+    <canvas id="chart-trend"></canvas>
+  </div>
 </div>
 
 <div id="coaching-section">
@@ -649,6 +657,8 @@ function refresh() {
   renderClubCarryChart(active);
   renderSmashChart(active);
   renderSpinChart(active);
+  renderGappingChart(active);
+  renderTrendChart();   // trend ignores the session filter — uses RAW directly
   renderInsights(active);
   renderAveragesTable(active);
   renderShotsTable(data);
@@ -1178,6 +1188,203 @@ function renderSpinChart(shots) {
         y: { title: { display: true, text: 'Avg Spin (rpm)', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } }
       }
     }
+  });
+}
+
+// --- Gapping Chart ---
+// Bars sorted longest -> shortest by median carry. Labels above each bar
+// show the gap (yards/meters) to the next-longer club. Color-coded:
+// green if gap is in a healthy range, amber if too tight/too wide.
+let chartGapping;
+function renderGappingChart(shots) {
+  const ctx = document.getElementById('chart-gapping').getContext('2d');
+  if (chartGapping) chartGapping.destroy();
+
+  // Median carry per club, only clubs with enough shots
+  const clubs = [...new Set(shots.map(s => s.club))]
+    .map(c => {
+      const carries = shots.filter(s => s.club === c && s.carry_m != null).map(s => s.carry_m).sort((a,b) => a - b);
+      if (carries.length < 3) return null;
+      return { club: c, median: carries[Math.floor(carries.length / 2)], n: carries.length };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.median - a.median);   // longest -> shortest
+
+  if (clubs.length < 2) {
+    if (chartGapping) chartGapping.destroy();
+    return;
+  }
+
+  // Compute gap to next-shorter club (in display units)
+  const gaps = clubs.map((c, i) => {
+    if (i === clubs.length - 1) return null;
+    return convDist(c.median) - convDist(clubs[i + 1].median);
+  });
+
+  // Healthy gap range: ~10-15 yd / 9-14 m. Color the bar by whether the
+  // gap TO THE NEXT CLUB is healthy.
+  const HEALTHY_LO_YD = 8, HEALTHY_HI_YD = 20;
+  const lo = units === 'imperial' ? HEALTHY_LO_YD : HEALTHY_LO_YD * 0.9144;
+  const hi = units === 'imperial' ? HEALTHY_HI_YD : HEALTHY_HI_YD * 0.9144;
+  const barColors = clubs.map((c, i) => {
+    if (i === clubs.length - 1) return (CLUB_COLORS[c.club] || '#6b7280') + 'cc';
+    const g = gaps[i];
+    if (g == null) return (CLUB_COLORS[c.club] || '#6b7280') + 'cc';
+    if (g < lo || g > hi) return '#f59e0b'; // amber - gap is off
+    return (CLUB_COLORS[c.club] || '#10b981') + 'cc';
+  });
+
+  chartGapping = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: clubs.map(c => c.club),
+      datasets: [{
+        label: 'Median carry (' + distUnit() + ')',
+        data: clubs.map(c => +convDist(c.median).toFixed(1)),
+        backgroundColor: barColors,
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      responsive: true,
+      indexAxis: 'x',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(c) {
+              const i = c.dataIndex;
+              const lines = [
+                clubs[i].club + ': ' + c.parsed.y.toFixed(1) + ' ' + distUnit() + '  (' + clubs[i].n + ' shots)',
+              ];
+              if (gaps[i] != null) {
+                lines.push('Gap to next: ' + gaps[i].toFixed(1) + ' ' + distUnit());
+              }
+              return lines;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } },
+        y: {
+          title: { display: true, text: 'Carry (' + distUnit() + ')', color: '#8a95a3' },
+          grid: { color: '#2d3640' },
+          ticks: { color: '#8a95a3' },
+          beginAtZero: true,
+        },
+      },
+      animation: {
+        onComplete: function(anim) {
+          // Draw gap labels between bars
+          const chart = anim.chart;
+          const ctx2 = chart.ctx;
+          const meta = chart.getDatasetMeta(0);
+          ctx2.save();
+          ctx2.fillStyle = '#e8ecf1';
+          ctx2.font = '600 11px -apple-system, sans-serif';
+          ctx2.textAlign = 'center';
+          meta.data.forEach((bar, i) => {
+            if (gaps[i] == null) return;
+            const x = bar.x;
+            const y = bar.y - 6;
+            const txt = '↓' + gaps[i].toFixed(0);
+            ctx2.fillStyle = (gaps[i] < lo || gaps[i] > hi) ? '#f59e0b' : '#10b981';
+            ctx2.fillText(txt, x, y);
+          });
+          ctx2.restore();
+        },
+      },
+    },
+  });
+}
+
+// --- Carry Trend Over Time ---
+// One line per club. X axis is session date. Y axis is median carry that
+// session. Deliberately ignores the global session filter (the whole
+// point is to look across sessions) but does respect the club filter.
+let chartTrend;
+function renderTrendChart() {
+  const ctx = document.getElementById('chart-trend').getContext('2d');
+  if (chartTrend) chartTrend.destroy();
+
+  // RAW already has all shots from all sessions. Group by (club, session_date)
+  // and compute median carry. Only include clubs the user has checked.
+  const byClub = {};
+  RAW.forEach(s => {
+    if (!selectedClubs.has(s.club)) return;
+    if (s.carry_m == null || !s.session_date) return;
+    byClub[s.club] = byClub[s.club] || {};
+    byClub[s.club][s.session_date] = byClub[s.club][s.session_date] || [];
+    byClub[s.club][s.session_date].push(s.carry_m);
+  });
+
+  const allDatesSorted = [...new Set(RAW.map(s => s.session_date))].filter(Boolean).sort();
+  if (allDatesSorted.length < 2) {
+    return; // not enough sessions to trend
+  }
+
+  const clubs = Object.keys(byClub).sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const datasets = clubs.map(club => {
+    const pts = allDatesSorted
+      .map(d => {
+        const vals = byClub[club][d];
+        if (!vals || vals.length === 0) return null;
+        vals.sort((a, b) => a - b);
+        const med = vals[Math.floor(vals.length / 2)];
+        return { x: d, y: +convDist(med).toFixed(1), n: vals.length };
+      })
+      .filter(p => p != null);
+    return {
+      label: club + '  (' + pts.length + ' sessions)',
+      data: pts,
+      borderColor: CLUB_COLORS[club] || '#6b7280',
+      backgroundColor: (CLUB_COLORS[club] || '#6b7280') + '40',
+      borderWidth: 2,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      tension: 0.2,
+      spanGaps: true,
+    };
+  });
+
+  chartTrend = new Chart(ctx, {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true,
+      parsing: false,  // we use {x,y} objects directly
+      plugins: {
+        legend: { labels: { color: '#8a95a3', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            title: function(items) { return items[0].raw.x; },
+            label: function(c) {
+              return c.dataset.label.split('  ')[0] + ': ' +
+                     c.parsed.y.toFixed(1) + ' ' + distUnit() +
+                     '  (' + c.raw.n + ' shots)';
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: 'category',
+          labels: allDatesSorted,
+          grid: { color: '#2d3640' },
+          ticks: { color: '#8a95a3', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 },
+        },
+        y: {
+          title: { display: true, text: 'Median carry (' + distUnit() + ')', color: '#8a95a3' },
+          grid: { color: '#2d3640' },
+          ticks: { color: '#8a95a3' },
+        },
+      },
+    },
   });
 }
 
