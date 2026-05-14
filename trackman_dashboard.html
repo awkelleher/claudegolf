@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trackman - All Sessions</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1419;--panel:#1a2028;--panel-2:#232b35;--border:#2d3640;
+  --text:#e8ecf1;--text-dim:#8a95a3;--accent:#f97316;
+  --good:#10b981;--warn:#f59e0b;--bad:#ef4444;--blue:#3b82f6;--pink:#ec4899;
+}
+html{font-size:14px}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.5;padding:0 1rem 3rem}
+a{color:var(--accent)}
+h1,h2,h3{font-weight:600}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 0;border-bottom:1px solid var(--border);margin-bottom:1.25rem}
+.header h1{font-size:1.5rem;letter-spacing:-0.02em}
+.header h1 span{color:var(--accent)}
+.unit-toggle{display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.unit-toggle button{background:var(--panel);color:var(--text-dim);border:none;padding:0.4rem 1rem;cursor:pointer;font-size:0.85rem;transition:all .15s}
+.unit-toggle button.active{background:var(--accent);color:#fff}
+
+/* Filters */
+.filters-bar{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.25rem;display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start}
+.filter-group{display:flex;flex-direction:column;gap:0.35rem}
+.filter-group label.group-label{font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-dim);font-weight:600}
+.filter-checks{display:flex;flex-wrap:wrap;gap:0.35rem}
+.filter-checks label{display:flex;align-items:center;gap:0.3rem;font-size:0.82rem;cursor:pointer;background:var(--panel-2);padding:0.25rem 0.5rem;border-radius:4px;border:1px solid var(--border);transition:all .15s;user-select:none}
+.filter-checks label:hover{border-color:var(--accent)}
+.filter-checks input[type=checkbox]{accent-color:var(--accent);cursor:pointer}
+.filter-checks label.all-toggle{font-weight:600;color:var(--accent)}
+.outlier-select{background:var(--panel-2);color:var(--text);border:1px solid var(--border);padding:0.35rem 0.5rem;border-radius:4px;font-size:0.82rem;cursor:pointer}
+.outlier-select:focus{outline:1px solid var(--accent)}
+.shot-count{margin-left:auto;font-size:0.85rem;color:var(--text-dim);align-self:center;white-space:nowrap}
+.shot-count strong{color:var(--text)}
+
+/* Club cards */
+.club-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;margin-bottom:1.25rem}
+.club-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:0.85rem 1rem;position:relative;overflow:hidden}
+.club-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.club-card .club-name{font-size:1rem;font-weight:700;margin-bottom:0.1rem}
+.club-card .club-note{font-size:0.7rem;color:var(--text-dim);font-style:italic;margin-bottom:0.25rem}
+.club-card .shot-cnt{font-size:0.75rem;color:var(--text-dim);margin-bottom:0.5rem}
+.club-card .stats{display:grid;grid-template-columns:1fr 1fr;gap:0.3rem}
+.club-card .stat{display:flex;flex-direction:column}
+.club-card .stat .label{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-dim)}
+.club-card .stat .value{font-size:0.95rem;font-weight:600}
+
+/* Charts */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.25rem}
+@media(max-width:900px){.charts-grid{grid-template-columns:1fr}}
+.chart-panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:1rem}
+.chart-panel h3{font-size:0.9rem;margin-bottom:0.75rem;color:var(--text-dim)}
+.chart-panel canvas{width:100%!important}
+.chart-full{grid-column:1/-1}
+
+/* Tables */
+.table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1.25rem;overflow-x:auto}
+.table-wrap h3{font-size:0.9rem;margin-bottom:0.75rem;color:var(--text-dim)}
+table{width:100%;border-collapse:collapse;font-size:0.82rem}
+th{text-align:left;padding:0.5rem 0.6rem;border-bottom:2px solid var(--border);color:var(--text-dim);font-weight:600;cursor:pointer;user-select:none;white-space:nowrap}
+th:hover{color:var(--accent)}
+th .sort-arrow{margin-left:0.25rem;font-size:0.7rem}
+td{padding:0.4rem 0.6rem;border-bottom:1px solid var(--border);white-space:nowrap}
+tr:hover td{background:var(--panel-2)}
+tr.dimmed td{opacity:0.4;text-decoration:line-through}
+.pill{display:inline-block;padding:0.1rem 0.45rem;border-radius:3px;font-size:0.72rem;font-weight:600}
+.pill-pure{background:rgba(16,185,129,0.15);color:var(--good)}
+.pill-good{background:rgba(245,158,11,0.15);color:var(--warn)}
+.pill-ok{background:rgba(138,149,163,0.15);color:var(--text-dim)}
+.pill-mishit{background:rgba(239,68,68,0.15);color:var(--bad)}
+.takeaway{background:var(--panel);border-left:3px solid var(--accent);padding:16px 20px;border-radius:0 8px 8px 0;margin-top:14px}
+.takeaway h4{margin:0 0 8px;color:var(--accent);font-size:14px;font-weight:600}
+.takeaway p{margin:0;font-size:14px;color:var(--text);line-height:1.7}
+.takeaway .num{color:var(--accent);font-weight:600}
+.practice-plan{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px 24px;margin-top:14px}
+.practice-plan ol{margin:0;padding-left:20px;line-height:1.8;font-size:14px}
+.practice-plan li{margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Trackman <span>&#183;</span> All Sessions</h1>
+  <div class="unit-toggle">
+    <button id="btn-imperial" class="active" onclick="setUnits('imperial')">Yards / mph</button>
+    <button id="btn-metric" onclick="setUnits('metric')">Meters / m/s</button>
+  </div>
+</div>
+
+<div class="filters-bar" id="filters-bar">
+  <div class="filter-group">
+    <label class="group-label">Session</label>
+    <select class="outlier-select" id="session-select" onchange="onSessionChange()">
+      <option value="all">All Sessions</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label class="group-label">Clubs</label>
+    <div class="filter-checks" id="club-filters"></div>
+  </div>
+  <div class="filter-group">
+    <label class="group-label">Outlier Filter</label>
+    <select class="outlier-select" id="outlier-mode" onchange="refresh()">
+      <option value="all">All Shots</option>
+      <option value="mishit">Hide Mishits (smash &lt; 1.0)</option>
+      <option value="iqr">IQR Filter</option>
+    </select>
+  </div>
+  <div class="shot-count" id="shot-count"></div>
+</div>
+
+<div class="club-cards" id="club-cards"></div>
+
+<div class="charts-grid">
+  <div class="chart-panel"><h3>Dispersion (Carry vs Side)</h3><canvas id="chart-dispersion"></canvas></div>
+  <div class="chart-panel"><h3>Carry by Club</h3><canvas id="chart-club-carry"></canvas></div>
+  <div class="chart-panel"><h3>Smash Factor Distribution</h3><canvas id="chart-smash"></canvas></div>
+  <div class="chart-panel"><h3>Spin Rate by Club</h3><canvas id="chart-spin"></canvas></div>
+</div>
+
+<div id="coaching-section">
+  <h2 style="font-size:1.1rem;margin:1.25rem 0 0;font-weight:600">Coaching Takeaways</h2>
+  <div id="takeaways-content"></div>
+  <h2 style="font-size:1.1rem;margin:1.25rem 0 0;font-weight:600">Suggested Practice Plan</h2>
+  <div id="practice-plan-content"></div>
+</div>
+
+<div class="table-wrap">
+  <h3>Club Averages</h3>
+  <table id="table-averages">
+    <thead><tr>
+      <th>Club</th><th># Shots</th><th>Avg Carry</th><th>Carry sigma</th><th>Avg Ball Spd</th><th>Avg Smash</th><th>Avg Spin</th><th>Avg Side</th>
+    </tr></thead>
+    <tbody id="avg-body"></tbody>
+  </table>
+</div>
+
+<div class="table-wrap">
+  <h3>Per-Shot Detail</h3>
+  <table id="table-shots">
+    <thead><tr>
+      <th data-key="session_date">Date<span class="sort-arrow"></span></th>
+      <th data-key="club">Club<span class="sort-arrow"></span></th>
+      <th data-key="shot_num">#<span class="sort-arrow"></span></th>
+      <th data-key="club_speed_mps">Club Spd<span class="sort-arrow"></span></th>
+      <th data-key="ball_speed_mps">Ball Spd<span class="sort-arrow"></span></th>
+      <th data-key="smash_factor">Smash<span class="sort-arrow"></span></th>
+      <th data-key="attack_angle_deg">AoA<span class="sort-arrow"></span></th>
+      <th data-key="spin_rate_rpm">Spin<span class="sort-arrow"></span></th>
+      <th data-key="carry_m">Carry<span class="sort-arrow"></span></th>
+      <th data-key="side_m">Side<span class="sort-arrow"></span></th>
+      <th>Quality</th>
+    </tr></thead>
+    <tbody id="shots-body"></tbody>
+  </table>
+</div>
+
+<script>
+const M_TO_YD = 1.0936133;
+const MPS_TO_MPH = 2.2369363;
+const CLUB_ORDER = ['Dr','5W','5i','7i','8i','PW','SW','Unknown'];
+const CLUB_COLORS = {Dr:'#f97316','5W':'#3b82f6','5i':'#ec4899','7i':'#06b6d4','8i':'#10b981',PW:'#f59e0b',SW:'#ef4444',Unknown:'#6b7280'};
+
+const TOUR_CARRY_M = {Dr:256,  '5W':224, '5i':192, '7i':165, '8i':152, PW:128, SW:98};
+const SCRATCH_CARRY_M = {Dr:229, '5W':201, '5i':174, '7i':150, '8i':137, PW:114, SW:88};
+const TOUR_SPIN = {Dr:2700, '5W':3500, '5i':5000, '7i':7000, '8i':8000, PW:9300, SW:10000};
+const SCRATCH_SPIN = {Dr:3100, '5W':4000, '5i':5500, '7i':7200, '8i':8300, PW:9500, SW:10200};
+
+let units = 'imperial';
+let sortKey = 'session_date';
+let sortDir = 1;
+let chartDispersion, chartSession, chartSmash, chartSpin;
+
+const RAW = [
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:1,club_speed_mps:46.0,attack_angle_deg:6.0,ball_speed_mps:63.6,spin_rate_rpm:2770,carry_m:198.4,side_m:-18.8,smash_factor:1.383},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:2,club_speed_mps:45.2,attack_angle_deg:4.4,ball_speed_mps:63.1,spin_rate_rpm:2420,carry_m:198.7,side_m:-23.2,smash_factor:1.396},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:3,club_speed_mps:45.2,attack_angle_deg:2.2,ball_speed_mps:63.6,spin_rate_rpm:3900,carry_m:201.6,side_m:41.7,smash_factor:1.407},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:4,club_speed_mps:45.8,attack_angle_deg:2.8,ball_speed_mps:65.6,spin_rate_rpm:3720,carry_m:211.7,side_m:38.9,smash_factor:1.432},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:5,club_speed_mps:44.4,attack_angle_deg:3.0,ball_speed_mps:64.7,spin_rate_rpm:2900,carry_m:219.9,side_m:9.1,smash_factor:1.457},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:6,club_speed_mps:45.1,attack_angle_deg:3.6,ball_speed_mps:62.9,spin_rate_rpm:3390,carry_m:205.2,side_m:58.1,smash_factor:1.395},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:7,club_speed_mps:44.6,attack_angle_deg:5.4,ball_speed_mps:65.9,spin_rate_rpm:2380,carry_m:229.0,side_m:-9.6,smash_factor:1.478},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:8,club_speed_mps:44.8,attack_angle_deg:4.4,ball_speed_mps:63.0,spin_rate_rpm:1720,carry_m:194.1,side_m:-19.5,smash_factor:1.406},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:9,club_speed_mps:46.2,attack_angle_deg:4.6,ball_speed_mps:65.5,spin_rate_rpm:2890,carry_m:219.4,side_m:30.9,smash_factor:1.418},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:10,club_speed_mps:44.5,attack_angle_deg:4.2,ball_speed_mps:65.0,spin_rate_rpm:2460,carry_m:224.2,side_m:-7.0,smash_factor:1.461},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:11,club_speed_mps:46.7,attack_angle_deg:null,ball_speed_mps:58.1,spin_rate_rpm:2470,carry_m:128.8,side_m:-4.8,smash_factor:1.244},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:12,club_speed_mps:44.6,attack_angle_deg:4.0,ball_speed_mps:63.9,spin_rate_rpm:1970,carry_m:203.9,side_m:-14.4,smash_factor:1.433},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:13,club_speed_mps:44.3,attack_angle_deg:6.2,ball_speed_mps:64.4,spin_rate_rpm:2580,carry_m:223.5,side_m:2.5,smash_factor:1.454},
+{session_date:"2026-05-08",session_id:"2a637be4-1b4b-f111-9c8c-c86e08cb2270",club:"Dr",shot_num:14,club_speed_mps:45.5,attack_angle_deg:3.2,ball_speed_mps:63.4,spin_rate_rpm:2420,carry_m:185.5,side_m:4.4,smash_factor:1.393},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:1,club_speed_mps:44.7,attack_angle_deg:5.2,ball_speed_mps:64.3,spin_rate_rpm:3260,carry_m:213.9,side_m:16.4,smash_factor:1.439},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:2,club_speed_mps:42.6,attack_angle_deg:1.6,ball_speed_mps:61.6,spin_rate_rpm:4900,carry_m:185.9,side_m:28.4,smash_factor:1.446},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:3,club_speed_mps:43.7,attack_angle_deg:null,ball_speed_mps:35.1,spin_rate_rpm:5870,carry_m:83.9,side_m:-14.5,smash_factor:0.803},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:4,club_speed_mps:45.6,attack_angle_deg:5.3,ball_speed_mps:64.7,spin_rate_rpm:3020,carry_m:219.1,side_m:-0.9,smash_factor:1.419},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:5,club_speed_mps:42.2,attack_angle_deg:1.2,ball_speed_mps:62.1,spin_rate_rpm:5020,carry_m:186.5,side_m:27.5,smash_factor:1.471},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:6,club_speed_mps:47.0,attack_angle_deg:5.2,ball_speed_mps:65.8,spin_rate_rpm:1560,carry_m:7.0,side_m:-0.1,smash_factor:1.400},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:7,club_speed_mps:42.6,attack_angle_deg:1.4,ball_speed_mps:59.2,spin_rate_rpm:3810,carry_m:187.2,side_m:-36.5,smash_factor:1.390},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:8,club_speed_mps:44.3,attack_angle_deg:7.8,ball_speed_mps:34.0,spin_rate_rpm:7533,carry_m:72.2,side_m:-35.5,smash_factor:0.768},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:9,club_speed_mps:42.6,attack_angle_deg:2.0,ball_speed_mps:62.3,spin_rate_rpm:4542,carry_m:193.3,side_m:-6.2,smash_factor:1.463},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:10,club_speed_mps:42.9,attack_angle_deg:4.0,ball_speed_mps:59.2,spin_rate_rpm:3620,carry_m:187.1,side_m:-55.4,smash_factor:1.380},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:11,club_speed_mps:42.4,attack_angle_deg:2.2,ball_speed_mps:56.4,spin_rate_rpm:4020,carry_m:176.2,side_m:-12.0,smash_factor:1.330},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5W",shot_num:12,club_speed_mps:45.0,attack_angle_deg:5.6,ball_speed_mps:62.0,spin_rate_rpm:3170,carry_m:206.6,side_m:-20.8,smash_factor:1.378},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:1,club_speed_mps:39.7,attack_angle_deg:1.2,ball_speed_mps:56.3,spin_rate_rpm:5210,carry_m:166.5,side_m:16.4,smash_factor:1.418},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:2,club_speed_mps:36.8,attack_angle_deg:-0.4,ball_speed_mps:49.9,spin_rate_rpm:3650,carry_m:142.9,side_m:10.6,smash_factor:1.356},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:3,club_speed_mps:39.6,attack_angle_deg:0.6,ball_speed_mps:56.8,spin_rate_rpm:4840,carry_m:171.6,side_m:7.9,smash_factor:1.434},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:4,club_speed_mps:38.0,attack_angle_deg:0.0,ball_speed_mps:48.7,spin_rate_rpm:6480,carry_m:133.9,side_m:20.2,smash_factor:1.282},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:5,club_speed_mps:38.1,attack_angle_deg:-1.0,ball_speed_mps:52.2,spin_rate_rpm:5799,carry_m:150.0,side_m:-6.3,smash_factor:1.370},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:6,club_speed_mps:40.1,attack_angle_deg:0.6,ball_speed_mps:56.8,spin_rate_rpm:2989,carry_m:184.1,side_m:-22.6,smash_factor:1.417},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:7,club_speed_mps:39.3,attack_angle_deg:0.4,ball_speed_mps:57.9,spin_rate_rpm:4400,carry_m:179.0,side_m:-10.5,smash_factor:1.473},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:8,club_speed_mps:41.0,attack_angle_deg:11.4,ball_speed_mps:33.1,spin_rate_rpm:2738,carry_m:62.1,side_m:1.6,smash_factor:0.807},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:9,club_speed_mps:40.5,attack_angle_deg:0.0,ball_speed_mps:56.8,spin_rate_rpm:3620,carry_m:176.8,side_m:-2.0,smash_factor:1.402},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:10,club_speed_mps:39.0,attack_angle_deg:1.6,ball_speed_mps:47.3,spin_rate_rpm:3450,carry_m:134.5,side_m:-13.3,smash_factor:1.213},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:11,club_speed_mps:37.7,attack_angle_deg:0.2,ball_speed_mps:43.6,spin_rate_rpm:6310,carry_m:118.1,side_m:7.2,smash_factor:1.156},
+{session_date:"2026-05-08",session_id:"fc48fe13-194b-f111-9c8c-c86e08cb2270",club:"5i",shot_num:12,club_speed_mps:38.7,attack_angle_deg:0.8,ball_speed_mps:51.9,spin_rate_rpm:4280,carry_m:155.5,side_m:1.9,smash_factor:1.341},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:1,club_speed_mps:38.0,attack_angle_deg:null,ball_speed_mps:50.1,spin_rate_rpm:5383,carry_m:142.1,side_m:14.8,smash_factor:1.318},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:2,club_speed_mps:39.9,attack_angle_deg:null,ball_speed_mps:51.3,spin_rate_rpm:4291,carry_m:150.7,side_m:-59.7,smash_factor:1.286},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:3,club_speed_mps:41.6,attack_angle_deg:9.9,ball_speed_mps:53.9,spin_rate_rpm:3800,carry_m:112.7,side_m:35.9,smash_factor:1.296},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:4,club_speed_mps:39.6,attack_angle_deg:null,ball_speed_mps:50.2,spin_rate_rpm:8140,carry_m:134.1,side_m:-29.0,smash_factor:1.268},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:5,club_speed_mps:40.8,attack_angle_deg:null,ball_speed_mps:49.1,spin_rate_rpm:8420,carry_m:130.3,side_m:-22.7,smash_factor:1.203},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:6,club_speed_mps:40.2,attack_angle_deg:3.9,ball_speed_mps:50.1,spin_rate_rpm:1960,carry_m:129.4,side_m:27.6,smash_factor:1.246},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:7,club_speed_mps:45.8,attack_angle_deg:7.7,ball_speed_mps:63.7,spin_rate_rpm:1790,carry_m:200.4,side_m:-3.9,smash_factor:1.391},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:8,club_speed_mps:38.2,attack_angle_deg:null,ball_speed_mps:47.7,spin_rate_rpm:5600,carry_m:124.8,side_m:20.7,smash_factor:1.249},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:9,club_speed_mps:39.8,attack_angle_deg:null,ball_speed_mps:50.0,spin_rate_rpm:8230,carry_m:132.9,side_m:-20.4,smash_factor:1.256},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:10,club_speed_mps:38.5,attack_angle_deg:7.9,ball_speed_mps:52.5,spin_rate_rpm:3608,carry_m:153.7,side_m:-4.0,smash_factor:1.364},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:11,club_speed_mps:40.4,attack_angle_deg:null,ball_speed_mps:47.8,spin_rate_rpm:7690,carry_m:139.9,side_m:-8.6,smash_factor:1.183},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:12,club_speed_mps:39.6,attack_angle_deg:null,ball_speed_mps:59.2,spin_rate_rpm:8500,carry_m:124.6,side_m:-3.1,smash_factor:1.495},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:13,club_speed_mps:43.8,attack_angle_deg:10.3,ball_speed_mps:59.2,spin_rate_rpm:2900,carry_m:159.3,side_m:-44.5,smash_factor:1.352},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:14,club_speed_mps:44.6,attack_angle_deg:null,ball_speed_mps:57.0,spin_rate_rpm:6362,carry_m:166.7,side_m:-12.8,smash_factor:1.278},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:15,club_speed_mps:null,attack_angle_deg:1.9,ball_speed_mps:49.1,spin_rate_rpm:6590,carry_m:135.9,side_m:-9.3,smash_factor:null},
+{session_date:"2025-01-04",session_id:"dc2962e1-bdca-ef11-9457-b068e6110422",club:"7i",shot_num:16,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:4860,carry_m:31.4,side_m:-6.7,smash_factor:null},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:1,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:3478,carry_m:149.3,side_m:-35.6,smash_factor:null},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:2,club_speed_mps:33.6,attack_angle_deg:null,ball_speed_mps:43.7,spin_rate_rpm:5449,carry_m:119.6,side_m:-8.3,smash_factor:1.301},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:3,club_speed_mps:null,attack_angle_deg:7.3,ball_speed_mps:48.2,spin_rate_rpm:4903,carry_m:122.8,side_m:25.9,smash_factor:null},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:4,club_speed_mps:36.7,attack_angle_deg:null,ball_speed_mps:54.0,spin_rate_rpm:3490,carry_m:168.8,side_m:-16.6,smash_factor:1.471},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:5,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:5921,carry_m:147.9,side_m:-18.4,smash_factor:null},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:6,club_speed_mps:37.2,attack_angle_deg:0.7,ball_speed_mps:50.2,spin_rate_rpm:4120,carry_m:141.8,side_m:-17.4,smash_factor:1.349},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:7,club_speed_mps:36.0,attack_angle_deg:null,ball_speed_mps:49.9,spin_rate_rpm:1200,carry_m:45.6,side_m:1.2,smash_factor:1.386},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:8,club_speed_mps:29.5,attack_angle_deg:null,ball_speed_mps:42.1,spin_rate_rpm:1636,carry_m:120.8,side_m:-22.1,smash_factor:1.427},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:9,club_speed_mps:40.4,attack_angle_deg:null,ball_speed_mps:57.5,spin_rate_rpm:734,carry_m:107.5,side_m:6.0,smash_factor:1.423},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:10,club_speed_mps:32.4,attack_angle_deg:null,ball_speed_mps:49.0,spin_rate_rpm:5159,carry_m:140.3,side_m:-5.3,smash_factor:1.512},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:11,club_speed_mps:35.2,attack_angle_deg:null,ball_speed_mps:43.5,spin_rate_rpm:5020,carry_m:119.0,side_m:-32.1,smash_factor:1.236},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:12,club_speed_mps:34.2,attack_angle_deg:null,ball_speed_mps:20.2,spin_rate_rpm:5624,carry_m:33.7,side_m:-4.3,smash_factor:0.591},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:13,club_speed_mps:17.6,attack_angle_deg:null,ball_speed_mps:51.6,spin_rate_rpm:3840,carry_m:90.4,side_m:-3.1,smash_factor:2.932},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:14,club_speed_mps:36.0,attack_angle_deg:null,ball_speed_mps:33.7,spin_rate_rpm:1925,carry_m:9.4,side_m:-1.5,smash_factor:0.936},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:15,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:9583,carry_m:113.7,side_m:13.0,smash_factor:null},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:16,club_speed_mps:29.9,attack_angle_deg:null,ball_speed_mps:41.1,spin_rate_rpm:4460,carry_m:107.5,side_m:-3.3,smash_factor:1.375},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:17,club_speed_mps:37.0,attack_angle_deg:null,ball_speed_mps:51.7,spin_rate_rpm:2717,carry_m:107.5,side_m:-13.6,smash_factor:1.397},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:18,club_speed_mps:39.1,attack_angle_deg:null,ball_speed_mps:54.9,spin_rate_rpm:4432,carry_m:116.0,side_m:-6.8,smash_factor:1.404},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:19,club_speed_mps:14.6,attack_angle_deg:null,ball_speed_mps:16.9,spin_rate_rpm:4006,carry_m:13.2,side_m:-40.0,smash_factor:1.158},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:20,club_speed_mps:34.0,attack_angle_deg:null,ball_speed_mps:40.5,spin_rate_rpm:3509,carry_m:111.7,side_m:-14.1,smash_factor:1.191},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:21,club_speed_mps:44.2,attack_angle_deg:null,ball_speed_mps:60.6,spin_rate_rpm:5484,carry_m:173.1,side_m:87.8,smash_factor:1.371},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:22,club_speed_mps:35.8,attack_angle_deg:null,ball_speed_mps:48.8,spin_rate_rpm:5240,carry_m:140.1,side_m:0.0,smash_factor:1.363},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:23,club_speed_mps:37.6,attack_angle_deg:null,ball_speed_mps:51.9,spin_rate_rpm:3910,carry_m:137.1,side_m:-28.6,smash_factor:1.380},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:24,club_speed_mps:39.1,attack_angle_deg:null,ball_speed_mps:54.7,spin_rate_rpm:4396,carry_m:166.0,side_m:-9.4,smash_factor:1.399},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:25,club_speed_mps:34.1,attack_angle_deg:null,ball_speed_mps:49.1,spin_rate_rpm:1731,carry_m:42.3,side_m:10.1,smash_factor:1.440},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:26,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:9124,carry_m:12.8,side_m:-0.6,smash_factor:null},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:27,club_speed_mps:36.8,attack_angle_deg:null,ball_speed_mps:34.6,spin_rate_rpm:4051,carry_m:159.7,side_m:-8.2,smash_factor:0.940},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:28,club_speed_mps:36.9,attack_angle_deg:null,ball_speed_mps:52.4,spin_rate_rpm:7896,carry_m:114.6,side_m:-11.0,smash_factor:1.420},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:29,club_speed_mps:18.9,attack_angle_deg:null,ball_speed_mps:43.9,spin_rate_rpm:4433,carry_m:45.2,side_m:-3.9,smash_factor:2.323},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:30,club_speed_mps:35.3,attack_angle_deg:null,ball_speed_mps:23.2,spin_rate_rpm:2490,carry_m:82.7,side_m:-15.0,smash_factor:0.657},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:31,club_speed_mps:41.2,attack_angle_deg:null,ball_speed_mps:51.1,spin_rate_rpm:692,carry_m:167.9,side_m:-8.2,smash_factor:1.240},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:32,club_speed_mps:36.3,attack_angle_deg:null,ball_speed_mps:59.9,spin_rate_rpm:5181,carry_m:149.6,side_m:-2.5,smash_factor:1.650},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:33,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:2134,carry_m:1.6,side_m:-0.2,smash_factor:null},
+{session_date:"2025-04-02",session_id:"cf9ce819-f50f-f011-97af-f8e43b3b1e60",club:"Unknown",shot_num:34,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:8240,carry_m:15.8,side_m:-3.1,smash_factor:null},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:1,club_speed_mps:41.6,attack_angle_deg:2.1,ball_speed_mps:53.4,spin_rate_rpm:4422,carry_m:160.6,side_m:28.0,smash_factor:1.284},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:2,club_speed_mps:35.3,attack_angle_deg:0.4,ball_speed_mps:48.9,spin_rate_rpm:5099,carry_m:140.5,side_m:15.9,smash_factor:1.385},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:3,club_speed_mps:37.3,attack_angle_deg:1.2,ball_speed_mps:50.2,spin_rate_rpm:3635,carry_m:152.4,side_m:0.9,smash_factor:1.346},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:4,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:6158,carry_m:60.9,side_m:-20.9,smash_factor:null},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:5,club_speed_mps:37.9,attack_angle_deg:-0.4,ball_speed_mps:28.3,spin_rate_rpm:2285,carry_m:141.9,side_m:-1.8,smash_factor:0.747},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:6,club_speed_mps:36.7,attack_angle_deg:-1.2,ball_speed_mps:52.1,spin_rate_rpm:2288,carry_m:52.1,side_m:-5.8,smash_factor:1.420},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:7,club_speed_mps:37.2,attack_angle_deg:-1.8,ball_speed_mps:53.2,spin_rate_rpm:5890,carry_m:147.7,side_m:-12.9,smash_factor:1.430},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:8,club_speed_mps:38.0,attack_angle_deg:-1.2,ball_speed_mps:52.1,spin_rate_rpm:5583,carry_m:143.5,side_m:-22.1,smash_factor:1.371},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:9,club_speed_mps:37.8,attack_angle_deg:0.6,ball_speed_mps:51.5,spin_rate_rpm:5296,carry_m:129.2,side_m:39.5,smash_factor:1.362},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:10,club_speed_mps:43.6,attack_angle_deg:3.5,ball_speed_mps:62.8,spin_rate_rpm:3229,carry_m:208.1,side_m:-8.6,smash_factor:1.440},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:11,club_speed_mps:33.9,attack_angle_deg:-1.8,ball_speed_mps:48.0,spin_rate_rpm:4581,carry_m:139.8,side_m:9.3,smash_factor:1.416},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:12,club_speed_mps:36.9,attack_angle_deg:-2.4,ball_speed_mps:48.7,spin_rate_rpm:6027,carry_m:135.4,side_m:26.8,smash_factor:1.320},
+{session_date:"2025-05-22",session_id:"3af888fa-4637-f011-a89f-b03cdc8d95a9",club:"Unknown",shot_num:13,club_speed_mps:42.9,attack_angle_deg:2.5,ball_speed_mps:58.6,spin_rate_rpm:2957,carry_m:193.0,side_m:-12.7,smash_factor:1.366},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"PW",shot_num:1,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:8416,carry_m:77.6,side_m:-2.3,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"PW",shot_num:2,club_speed_mps:34.3,attack_angle_deg:0.0,ball_speed_mps:33.0,spin_rate_rpm:6806,carry_m:107.7,side_m:-8.5,smash_factor:0.962},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"PW",shot_num:3,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:7914,carry_m:90.5,side_m:12.1,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"PW",shot_num:4,club_speed_mps:34.1,attack_angle_deg:-2.4,ball_speed_mps:41.2,spin_rate_rpm:8538,carry_m:105.7,side_m:13.5,smash_factor:1.208},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"PW",shot_num:5,club_speed_mps:35.4,attack_angle_deg:-3.2,ball_speed_mps:36.6,spin_rate_rpm:7728,carry_m:121.7,side_m:-1.3,smash_factor:1.034},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"PW",shot_num:6,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:8938,carry_m:115.3,side_m:-5.6,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"PW",shot_num:7,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:8467,carry_m:100.7,side_m:3.0,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"Dr",shot_num:1,club_speed_mps:43.6,attack_angle_deg:null,ball_speed_mps:28.8,spin_rate_rpm:5947,carry_m:62.2,side_m:-25.7,smash_factor:0.661},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"Dr",shot_num:2,club_speed_mps:42.2,attack_angle_deg:3.3,ball_speed_mps:58.3,spin_rate_rpm:3611,carry_m:186.2,side_m:22.6,smash_factor:1.381},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"Dr",shot_num:3,club_speed_mps:44.2,attack_angle_deg:1.9,ball_speed_mps:60.9,spin_rate_rpm:4286,carry_m:187.0,side_m:32.8,smash_factor:1.378},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"Dr",shot_num:4,club_speed_mps:42.3,attack_angle_deg:5.3,ball_speed_mps:59.1,spin_rate_rpm:4048,carry_m:182.0,side_m:59.6,smash_factor:1.397},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"Dr",shot_num:5,club_speed_mps:45.1,attack_angle_deg:4.9,ball_speed_mps:62.7,spin_rate_rpm:3891,carry_m:196.1,side_m:23.0,smash_factor:1.390},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"Dr",shot_num:6,club_speed_mps:46.3,attack_angle_deg:2.3,ball_speed_mps:60.2,spin_rate_rpm:3541,carry_m:195.3,side_m:1.5,smash_factor:1.300},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"Dr",shot_num:7,club_speed_mps:39.7,attack_angle_deg:2.9,ball_speed_mps:57.6,spin_rate_rpm:2585,carry_m:191.8,side_m:-9.3,smash_factor:1.451},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"Dr",shot_num:8,club_speed_mps:43.6,attack_angle_deg:3.5,ball_speed_mps:60.9,spin_rate_rpm:3637,carry_m:196.6,side_m:-30.5,smash_factor:1.397},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"Dr",shot_num:9,club_speed_mps:45.5,attack_angle_deg:3.7,ball_speed_mps:60.6,spin_rate_rpm:2046,carry_m:203.9,side_m:-19.1,smash_factor:1.332},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"7i",shot_num:1,club_speed_mps:37.4,attack_angle_deg:0.6,ball_speed_mps:47.5,spin_rate_rpm:2588,carry_m:146.4,side_m:-4.6,smash_factor:1.270},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"7i",shot_num:2,club_speed_mps:37.5,attack_angle_deg:-1.2,ball_speed_mps:50.0,spin_rate_rpm:5225,carry_m:144.8,side_m:16.0,smash_factor:1.333},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"7i",shot_num:3,club_speed_mps:37.5,attack_angle_deg:-2.2,ball_speed_mps:52.9,spin_rate_rpm:4014,carry_m:162.9,side_m:-5.1,smash_factor:1.411},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"7i",shot_num:4,club_speed_mps:37.0,attack_angle_deg:-1.4,ball_speed_mps:53.2,spin_rate_rpm:5128,carry_m:156.8,side_m:13.8,smash_factor:1.438},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"7i",shot_num:5,club_speed_mps:36.6,attack_angle_deg:0.8,ball_speed_mps:46.2,spin_rate_rpm:4349,carry_m:134.5,side_m:-5.7,smash_factor:1.262},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"7i",shot_num:6,club_speed_mps:36.7,attack_angle_deg:-2.8,ball_speed_mps:49.2,spin_rate_rpm:3914,carry_m:137.8,side_m:26.1,smash_factor:1.341},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"7i",shot_num:7,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:5930,carry_m:136.1,side_m:-8.7,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"7i",shot_num:8,club_speed_mps:37.6,attack_angle_deg:1.6,ball_speed_mps:42.3,spin_rate_rpm:4136,carry_m:115.3,side_m:-14.0,smash_factor:1.125},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:1,club_speed_mps:40.3,attack_angle_deg:2.4,ball_speed_mps:55.6,spin_rate_rpm:3658,carry_m:172.5,side_m:-56.8,smash_factor:1.380},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:2,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:3811,carry_m:181.1,side_m:3.5,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:3,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:2189,carry_m:99.8,side_m:-20.5,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:4,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:3577,carry_m:190.0,side_m:-35.6,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:5,club_speed_mps:40.9,attack_angle_deg:-0.2,ball_speed_mps:59.3,spin_rate_rpm:2973,carry_m:192.4,side_m:-17.9,smash_factor:1.450},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:6,club_speed_mps:40.1,attack_angle_deg:1.0,ball_speed_mps:54.3,spin_rate_rpm:3405,carry_m:166.5,side_m:-55.2,smash_factor:1.354},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:7,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:5514,carry_m:149.6,side_m:-13.8,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:8,club_speed_mps:41.5,attack_angle_deg:1.8,ball_speed_mps:52.0,spin_rate_rpm:2668,carry_m:203.1,side_m:-1.7,smash_factor:1.253},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:9,club_speed_mps:42.3,attack_angle_deg:-0.8,ball_speed_mps:60.2,spin_rate_rpm:2532,carry_m:195.3,side_m:-11.0,smash_factor:1.423},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:10,club_speed_mps:42.5,attack_angle_deg:-1.0,ball_speed_mps:61.9,spin_rate_rpm:3946,carry_m:198.2,side_m:11.9,smash_factor:1.456},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:11,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:3766,carry_m:198.9,side_m:-1.1,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:12,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:3505,carry_m:191.7,side_m:-10.0,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:13,club_speed_mps:41.7,attack_angle_deg:0.6,ball_speed_mps:59.3,spin_rate_rpm:4144,carry_m:177.1,side_m:-56.2,smash_factor:1.422},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"5W",shot_num:14,club_speed_mps:40.8,attack_angle_deg:0.0,ball_speed_mps:57.4,spin_rate_rpm:2519,carry_m:194.5,side_m:-13.3,smash_factor:1.407},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:1,club_speed_mps:null,attack_angle_deg:3.0,ball_speed_mps:53.5,spin_rate_rpm:4752,carry_m:160.3,side_m:-11.2,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:2,club_speed_mps:38.0,attack_angle_deg:null,ball_speed_mps:52.6,spin_rate_rpm:4472,carry_m:157.7,side_m:29.9,smash_factor:1.384},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:3,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:5968,carry_m:166.1,side_m:-8.4,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:4,club_speed_mps:38.7,attack_angle_deg:3.2,ball_speed_mps:55.7,spin_rate_rpm:3219,carry_m:150.3,side_m:23.0,smash_factor:1.439},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:5,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:6051,carry_m:148.1,side_m:-16.3,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:6,club_speed_mps:38.5,attack_angle_deg:0.4,ball_speed_mps:52.3,spin_rate_rpm:4274,carry_m:174.1,side_m:1.8,smash_factor:1.359},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:7,club_speed_mps:39.0,attack_angle_deg:1.0,ball_speed_mps:56.5,spin_rate_rpm:2877,carry_m:101.9,side_m:-17.7,smash_factor:1.449},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:8,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:-1.8,spin_rate_rpm:4256,carry_m:181.4,side_m:-9.4,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:9,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:5474,carry_m:181.4,side_m:-40.4,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:10,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:5402,carry_m:160.3,side_m:29.3,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:11,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:3815,carry_m:154.3,side_m:-26.1,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:12,club_speed_mps:null,attack_angle_deg:0.8,ball_speed_mps:57.6,spin_rate_rpm:4761,carry_m:174.3,side_m:-14.0,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:13,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:-0.8,spin_rate_rpm:4320,carry_m:181.5,side_m:7.3,smash_factor:null},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:14,club_speed_mps:39.3,attack_angle_deg:1.7,ball_speed_mps:56.4,spin_rate_rpm:4040,carry_m:177.1,side_m:-22.7,smash_factor:1.435},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:15,club_speed_mps:38.2,attack_angle_deg:-0.6,ball_speed_mps:56.7,spin_rate_rpm:4004,carry_m:174.1,side_m:-17.0,smash_factor:1.484},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:16,club_speed_mps:35.5,attack_angle_deg:-1.8,ball_speed_mps:57.6,spin_rate_rpm:5131,carry_m:171.4,side_m:-26.8,smash_factor:1.623},
+{session_date:"2025-06-17",session_id:"8e41e80b-b44b-f011-bbbf-10a51d50bb3e",club:"8i",shot_num:17,club_speed_mps:39.4,attack_angle_deg:-0.9,ball_speed_mps:56.6,spin_rate_rpm:4302,carry_m:174.7,side_m:7.6,smash_factor:1.437},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:1,club_speed_mps:26.5,attack_angle_deg:null,ball_speed_mps:25.1,spin_rate_rpm:6050,carry_m:50.8,side_m:-4.4,smash_factor:0.947},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:2,club_speed_mps:26.8,attack_angle_deg:null,ball_speed_mps:19.0,spin_rate_rpm:1870,carry_m:14.3,side_m:0.4,smash_factor:0.709},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:3,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:4690,carry_m:64.8,side_m:-6.2,smash_factor:null},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:4,club_speed_mps:24.6,attack_angle_deg:null,ball_speed_mps:31.1,spin_rate_rpm:3220,carry_m:134.1,side_m:-27.9,smash_factor:1.264},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:5,club_speed_mps:31.9,attack_angle_deg:0.7,ball_speed_mps:45.9,spin_rate_rpm:4790,carry_m:115.9,side_m:-7.9,smash_factor:1.439},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:6,club_speed_mps:31.5,attack_angle_deg:null,ball_speed_mps:42.2,spin_rate_rpm:6540,carry_m:58.8,side_m:-24.4,smash_factor:1.340},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:7,club_speed_mps:27.4,attack_angle_deg:null,ball_speed_mps:27.4,spin_rate_rpm:1630,carry_m:8.3,side_m:-2.2,smash_factor:1.000},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:8,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:5470,carry_m:66.7,side_m:-2.5,smash_factor:null},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:9,club_speed_mps:26.9,attack_angle_deg:null,ball_speed_mps:30.5,spin_rate_rpm:5350,carry_m:42.4,side_m:-11.7,smash_factor:1.134},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:10,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:4980,carry_m:27.8,side_m:3.0,smash_factor:null},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:11,club_speed_mps:31.3,attack_angle_deg:null,ball_speed_mps:23.1,spin_rate_rpm:5360,carry_m:126.0,side_m:-0.6,smash_factor:0.738},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:12,club_speed_mps:31.3,attack_angle_deg:null,ball_speed_mps:18.8,spin_rate_rpm:4160,carry_m:120.7,side_m:15.8,smash_factor:0.601},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:13,club_speed_mps:33.0,attack_angle_deg:-1.9,ball_speed_mps:48.3,spin_rate_rpm:5890,carry_m:112.3,side_m:-15.8,smash_factor:1.464},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:14,club_speed_mps:32.3,attack_angle_deg:-2.5,ball_speed_mps:43.0,spin_rate_rpm:1800,carry_m:118.8,side_m:-36.0,smash_factor:1.331},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:15,club_speed_mps:33.2,attack_angle_deg:null,ball_speed_mps:43.3,spin_rate_rpm:7220,carry_m:40.3,side_m:-3.1,smash_factor:1.304},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:16,club_speed_mps:33.2,attack_angle_deg:-1.3,ball_speed_mps:45.6,spin_rate_rpm:5020,carry_m:129.8,side_m:-12.1,smash_factor:1.373},
+{session_date:"2024-06-12",session_id:"59ef7ebb-1329-ef11-a82d-b03cdc8d95a9",club:"8i",shot_num:17,club_speed_mps:26.4,attack_angle_deg:null,ball_speed_mps:32.5,spin_rate_rpm:4130,carry_m:70.8,side_m:5.0,smash_factor:1.231},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:1,club_speed_mps:43.7,attack_angle_deg:4.5,ball_speed_mps:63.4,spin_rate_rpm:1800,carry_m:55.2,side_m:2.3,smash_factor:1.451},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:2,club_speed_mps:32.4,attack_angle_deg:4.6,ball_speed_mps:41.5,spin_rate_rpm:2980,carry_m:112.6,side_m:-2.8,smash_factor:1.281},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:3,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:4470,carry_m:178.5,side_m:-58.2,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:4,club_speed_mps:41.7,attack_angle_deg:7.1,ball_speed_mps:59.2,spin_rate_rpm:5770,carry_m:56.6,side_m:14.0,smash_factor:1.420},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:5,club_speed_mps:38.7,attack_angle_deg:null,ball_speed_mps:27.3,spin_rate_rpm:1800,carry_m:68.0,side_m:-0.2,smash_factor:0.705},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:6,club_speed_mps:null,attack_angle_deg:9.0,ball_speed_mps:34.9,spin_rate_rpm:6590,carry_m:128.5,side_m:-15.7,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:7,club_speed_mps:34.8,attack_angle_deg:3.6,ball_speed_mps:47.6,spin_rate_rpm:5040,carry_m:166.6,side_m:-34.3,smash_factor:1.368},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:8,club_speed_mps:38.0,attack_angle_deg:5.5,ball_speed_mps:56.9,spin_rate_rpm:6500,carry_m:127.2,side_m:-5.4,smash_factor:1.497},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:9,club_speed_mps:40.6,attack_angle_deg:null,ball_speed_mps:46.5,spin_rate_rpm:3400,carry_m:191.4,side_m:-11.7,smash_factor:1.145},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:10,club_speed_mps:null,attack_angle_deg:8.0,ball_speed_mps:59.1,spin_rate_rpm:3480,carry_m:138.8,side_m:-26.6,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:11,club_speed_mps:42.3,attack_angle_deg:null,ball_speed_mps:50.1,spin_rate_rpm:4980,carry_m:191.8,side_m:25.3,smash_factor:1.184},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:12,club_speed_mps:null,attack_angle_deg:3.4,ball_speed_mps:44.3,spin_rate_rpm:5820,carry_m:120.7,side_m:-28.2,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:13,club_speed_mps:38.3,attack_angle_deg:12.4,ball_speed_mps:34.3,spin_rate_rpm:1820,carry_m:40.3,side_m:-0.8,smash_factor:0.896},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:14,club_speed_mps:38.3,attack_angle_deg:null,ball_speed_mps:24.8,spin_rate_rpm:2880,carry_m:32.1,side_m:17.3,smash_factor:0.648},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:15,club_speed_mps:null,attack_angle_deg:5.0,ball_speed_mps:63.2,spin_rate_rpm:5380,carry_m:150.1,side_m:-54.2,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:16,club_speed_mps:38.2,attack_angle_deg:null,ball_speed_mps:31.4,spin_rate_rpm:3470,carry_m:154.8,side_m:-3.8,smash_factor:0.822},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:17,club_speed_mps:null,attack_angle_deg:8.4,ball_speed_mps:51.4,spin_rate_rpm:2120,carry_m:8.5,side_m:0.5,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:18,club_speed_mps:37.9,attack_angle_deg:null,ball_speed_mps:4.3,spin_rate_rpm:1610,carry_m:1.9,side_m:-0.5,smash_factor:0.113},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:19,club_speed_mps:40.0,attack_angle_deg:6.0,ball_speed_mps:59.1,spin_rate_rpm:1610,carry_m:161.4,side_m:-16.8,smash_factor:1.478},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:20,club_speed_mps:38.8,attack_angle_deg:null,ball_speed_mps:28.4,spin_rate_rpm:2590,carry_m:59.9,side_m:-10.9,smash_factor:0.732},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:21,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:2610,carry_m:65.6,side_m:-12.3,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:22,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:8040,carry_m:138.9,side_m:-24.3,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:23,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:5410,carry_m:165.0,side_m:-6.7,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:24,club_speed_mps:null,attack_angle_deg:7.7,ball_speed_mps:56.1,spin_rate_rpm:6880,carry_m:117.4,side_m:11.9,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:25,club_speed_mps:43.7,attack_angle_deg:null,ball_speed_mps:44.0,spin_rate_rpm:3510,carry_m:198.6,side_m:-2.5,smash_factor:1.007},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:26,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:5800,carry_m:59.5,side_m:-15.7,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:27,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:null,spin_rate_rpm:7540,carry_m:99.2,side_m:-5.4,smash_factor:null},
+{session_date:"2024-06-11",session_id:"6ef373a9-5328-ef11-b475-b03cdcbb3a5e",club:"Unknown",shot_num:28,club_speed_mps:39.5,attack_angle_deg:3.4,ball_speed_mps:55.2,spin_rate_rpm:3310,carry_m:162.8,side_m:26.9,smash_factor:1.397},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:1,club_speed_mps:26.6,attack_angle_deg:0.6,ball_speed_mps:27.7,spin_rate_rpm:7560,carry_m:60.0,side_m:-2.2,smash_factor:1.041},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:2,club_speed_mps:26.5,attack_angle_deg:-3.4,ball_speed_mps:29.3,spin_rate_rpm:7480,carry_m:65.2,side_m:7.9,smash_factor:1.106},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:3,club_speed_mps:25.0,attack_angle_deg:0.8,ball_speed_mps:29.2,spin_rate_rpm:6380,carry_m:66.2,side_m:-7.0,smash_factor:1.168},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:4,club_speed_mps:18.9,attack_angle_deg:4.2,ball_speed_mps:18.6,spin_rate_rpm:5760,carry_m:31.0,side_m:0.0,smash_factor:0.984},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:5,club_speed_mps:19.7,attack_angle_deg:2.4,ball_speed_mps:21.4,spin_rate_rpm:5700,carry_m:38.8,side_m:1.0,smash_factor:1.086},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:6,club_speed_mps:25.7,attack_angle_deg:-1.0,ball_speed_mps:28.4,spin_rate_rpm:7620,carry_m:62.1,side_m:-1.6,smash_factor:1.105},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:7,club_speed_mps:26.0,attack_angle_deg:-5.2,ball_speed_mps:33.2,spin_rate_rpm:6740,carry_m:78.8,side_m:-5.7,smash_factor:1.277},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:8,club_speed_mps:26.3,attack_angle_deg:0.0,ball_speed_mps:29.2,spin_rate_rpm:6610,carry_m:65.1,side_m:-5.4,smash_factor:1.110},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:9,club_speed_mps:19.2,attack_angle_deg:6.4,ball_speed_mps:19.1,spin_rate_rpm:4040,carry_m:32.0,side_m:-3.7,smash_factor:0.995},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:10,club_speed_mps:25.8,attack_angle_deg:null,ball_speed_mps:21.3,spin_rate_rpm:4280,carry_m:34.1,side_m:-4.7,smash_factor:0.826},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:11,club_speed_mps:26.5,attack_angle_deg:-3.4,ball_speed_mps:33.1,spin_rate_rpm:7000,carry_m:78.7,side_m:-6.2,smash_factor:1.249},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:12,club_speed_mps:20.0,attack_angle_deg:4.2,ball_speed_mps:19.2,spin_rate_rpm:5390,carry_m:32.8,side_m:-2.8,smash_factor:0.960},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:13,club_speed_mps:25.0,attack_angle_deg:null,ball_speed_mps:27.6,spin_rate_rpm:6890,carry_m:60.0,side_m:-4.2,smash_factor:1.104},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"PW",shot_num:14,club_speed_mps:28.3,attack_angle_deg:1.4,ball_speed_mps:31.1,spin_rate_rpm:6570,carry_m:72.7,side_m:-3.8,smash_factor:1.099},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"Dr",shot_num:1,club_speed_mps:30.2,attack_angle_deg:-2.7,ball_speed_mps:44.1,spin_rate_rpm:3590,carry_m:119.6,side_m:9.1,smash_factor:1.460},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"Dr",shot_num:2,club_speed_mps:30.9,attack_angle_deg:0.0,ball_speed_mps:43.5,spin_rate_rpm:3720,carry_m:119.2,side_m:8.6,smash_factor:1.408},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"Dr",shot_num:3,club_speed_mps:31.0,attack_angle_deg:-3.9,ball_speed_mps:41.2,spin_rate_rpm:4870,carry_m:107.0,side_m:29.9,smash_factor:1.329},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"Dr",shot_num:4,club_speed_mps:31.4,attack_angle_deg:-0.2,ball_speed_mps:40.1,spin_rate_rpm:4720,carry_m:109.0,side_m:-12.0,smash_factor:1.277},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"Dr",shot_num:5,club_speed_mps:31.7,attack_angle_deg:-1.2,ball_speed_mps:44.4,spin_rate_rpm:3250,carry_m:119.8,side_m:-5.6,smash_factor:1.401},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"Dr",shot_num:6,club_speed_mps:31.0,attack_angle_deg:0.2,ball_speed_mps:44.3,spin_rate_rpm:3160,carry_m:121.3,side_m:4.4,smash_factor:1.429},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"Dr",shot_num:7,club_speed_mps:31.7,attack_angle_deg:-1.5,ball_speed_mps:47.3,spin_rate_rpm:2680,carry_m:126.8,side_m:-17.9,smash_factor:1.492},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"7i",shot_num:1,club_speed_mps:25.9,attack_angle_deg:-2.2,ball_speed_mps:32.0,spin_rate_rpm:7930,carry_m:73.8,side_m:8.4,smash_factor:1.236},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"7i",shot_num:2,club_speed_mps:25.5,attack_angle_deg:-3.4,ball_speed_mps:34.6,spin_rate_rpm:6700,carry_m:85.0,side_m:0.9,smash_factor:1.357},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"7i",shot_num:3,club_speed_mps:26.6,attack_angle_deg:-1.0,ball_speed_mps:32.9,spin_rate_rpm:6260,carry_m:79.0,side_m:-6.3,smash_factor:1.237},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"7i",shot_num:4,club_speed_mps:27.0,attack_angle_deg:-3.4,ball_speed_mps:32.8,spin_rate_rpm:8240,carry_m:75.9,side_m:11.6,smash_factor:1.215},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"7i",shot_num:5,club_speed_mps:25.7,attack_angle_deg:-1.6,ball_speed_mps:34.3,spin_rate_rpm:6550,carry_m:84.0,side_m:0.4,smash_factor:1.335},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"7i",shot_num:6,club_speed_mps:25.8,attack_angle_deg:-2.0,ball_speed_mps:29.8,spin_rate_rpm:7060,carry_m:67.2,side_m:-3.4,smash_factor:1.155},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"7i",shot_num:7,club_speed_mps:26.5,attack_angle_deg:-4.4,ball_speed_mps:33.5,spin_rate_rpm:6920,carry_m:80.1,side_m:-0.6,smash_factor:1.264},
+{session_date:"2024-07-23",session_id:"e4d857bd-0e49-ef11-846b-b03cdc8d9414",club:"7i",shot_num:8,club_speed_mps:26.7,attack_angle_deg:-6.0,ball_speed_mps:35.7,spin_rate_rpm:7680,carry_m:87.5,side_m:-2.4,smash_factor:1.337},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"PW",shot_num:1,club_speed_mps:26.5,attack_angle_deg:-4.4,ball_speed_mps:34.5,spin_rate_rpm:7180,carry_m:83.7,side_m:6.0,smash_factor:1.302},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"PW",shot_num:2,club_speed_mps:24.9,attack_angle_deg:-3.2,ball_speed_mps:33.0,spin_rate_rpm:5830,carry_m:78.7,side_m:2.0,smash_factor:1.325},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"PW",shot_num:3,club_speed_mps:25.0,attack_angle_deg:-2.2,ball_speed_mps:30.1,spin_rate_rpm:6250,carry_m:67.9,side_m:-7.4,smash_factor:1.204},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"PW",shot_num:4,club_speed_mps:25.8,attack_angle_deg:-7.8,ball_speed_mps:32.6,spin_rate_rpm:5440,carry_m:72.7,side_m:6.0,smash_factor:1.264},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"PW",shot_num:5,club_speed_mps:25.2,attack_angle_deg:-2.6,ball_speed_mps:31.1,spin_rate_rpm:7830,carry_m:71.5,side_m:-12.8,smash_factor:1.234},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"PW",shot_num:6,club_speed_mps:25.3,attack_angle_deg:-3.8,ball_speed_mps:25.5,spin_rate_rpm:6660,carry_m:51.0,side_m:-9.5,smash_factor:1.008},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"PW",shot_num:7,club_speed_mps:24.4,attack_angle_deg:-3.8,ball_speed_mps:32.7,spin_rate_rpm:5840,carry_m:78.2,side_m:-2.4,smash_factor:1.340},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"PW",shot_num:8,club_speed_mps:25.1,attack_angle_deg:-4.2,ball_speed_mps:30.7,spin_rate_rpm:6320,carry_m:69.7,side_m:-4.9,smash_factor:1.223},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:1,club_speed_mps:22.9,attack_angle_deg:-6.4,ball_speed_mps:26.5,spin_rate_rpm:6880,carry_m:55.9,side_m:0.7,smash_factor:1.157},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:2,club_speed_mps:16.4,attack_angle_deg:null,ball_speed_mps:16.5,spin_rate_rpm:4340,carry_m:25.1,side_m:-0.1,smash_factor:1.006},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:3,club_speed_mps:23.1,attack_angle_deg:-2.0,ball_speed_mps:25.7,spin_rate_rpm:6260,carry_m:53.5,side_m:4.7,smash_factor:1.113},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:4,club_speed_mps:19.2,attack_angle_deg:null,ball_speed_mps:10.8,spin_rate_rpm:2830,carry_m:11.2,side_m:-7.4,smash_factor:0.563},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:5,club_speed_mps:15.3,attack_angle_deg:1.2,ball_speed_mps:16.6,spin_rate_rpm:4420,carry_m:25.1,side_m:0.9,smash_factor:1.085},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:6,club_speed_mps:23.3,attack_angle_deg:-5.6,ball_speed_mps:29.6,spin_rate_rpm:6640,carry_m:67.0,side_m:-3.4,smash_factor:1.270},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:7,club_speed_mps:21.3,attack_angle_deg:-1.2,ball_speed_mps:25.0,spin_rate_rpm:5920,carry_m:51.4,side_m:-4.3,smash_factor:1.174},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:8,club_speed_mps:12.7,attack_angle_deg:3.0,ball_speed_mps:14.5,spin_rate_rpm:3030,carry_m:18.5,side_m:-0.4,smash_factor:1.142},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:9,club_speed_mps:22.7,attack_angle_deg:-4.2,ball_speed_mps:25.5,spin_rate_rpm:7070,carry_m:52.7,side_m:-3.2,smash_factor:1.123},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:10,club_speed_mps:16.6,attack_angle_deg:null,ball_speed_mps:14.6,spin_rate_rpm:2910,carry_m:19.4,side_m:-1.0,smash_factor:0.880},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:11,club_speed_mps:21.7,attack_angle_deg:0.4,ball_speed_mps:24.6,spin_rate_rpm:5390,carry_m:48.6,side_m:10.0,smash_factor:1.134},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:12,club_speed_mps:19.6,attack_angle_deg:1.4,ball_speed_mps:19.9,spin_rate_rpm:4540,carry_m:30.6,side_m:-8.5,smash_factor:1.015},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"SW",shot_num:13,club_speed_mps:21.6,attack_angle_deg:1.2,ball_speed_mps:21.5,spin_rate_rpm:5400,carry_m:39.0,side_m:-6.0,smash_factor:0.995},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:1,club_speed_mps:27.5,attack_angle_deg:-2.4,ball_speed_mps:35.0,spin_rate_rpm:6490,carry_m:83.8,side_m:15.4,smash_factor:1.273},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:2,club_speed_mps:29.0,attack_angle_deg:-3.2,ball_speed_mps:38.4,spin_rate_rpm:6620,carry_m:97.4,side_m:12.8,smash_factor:1.324},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:3,club_speed_mps:27.0,attack_angle_deg:0.0,ball_speed_mps:32.9,spin_rate_rpm:6070,carry_m:76.2,side_m:18.2,smash_factor:1.219},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:4,club_speed_mps:28.5,attack_angle_deg:-3.0,ball_speed_mps:36.7,spin_rate_rpm:6710,carry_m:90.5,side_m:25.9,smash_factor:1.288},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:5,club_speed_mps:28.1,attack_angle_deg:-1.2,ball_speed_mps:33.3,spin_rate_rpm:5460,carry_m:77.3,side_m:9.4,smash_factor:1.185},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:6,club_speed_mps:28.7,attack_angle_deg:-4.0,ball_speed_mps:37.2,spin_rate_rpm:6830,carry_m:92.2,side_m:5.9,smash_factor:1.296},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:7,club_speed_mps:26.8,attack_angle_deg:-4.4,ball_speed_mps:33.5,spin_rate_rpm:5860,carry_m:76.6,side_m:20.9,smash_factor:1.250},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:8,club_speed_mps:28.4,attack_angle_deg:-4.2,ball_speed_mps:30.6,spin_rate_rpm:3950,carry_m:48.4,side_m:-1.7,smash_factor:1.077},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:9,club_speed_mps:30.7,attack_angle_deg:-5.0,ball_speed_mps:40.4,spin_rate_rpm:3530,carry_m:78.0,side_m:13.1,smash_factor:1.316},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:10,club_speed_mps:29.3,attack_angle_deg:-0.2,ball_speed_mps:40.7,spin_rate_rpm:4910,carry_m:90.1,side_m:-23.7,smash_factor:1.389},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:11,club_speed_mps:28.8,attack_angle_deg:0.2,ball_speed_mps:35.8,spin_rate_rpm:4690,carry_m:86.8,side_m:2.3,smash_factor:1.243},
+{session_date:"2024-07-23",session_id:"a4e2a7c7-0849-ef11-846b-b03cdc8d9414",club:"7i",shot_num:12,club_speed_mps:28.2,attack_angle_deg:-2.6,ball_speed_mps:26.9,spin_rate_rpm:5460,carry_m:52.3,side_m:-45.9,smash_factor:0.954},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"SW",shot_num:1,club_speed_mps:26.0,attack_angle_deg:-1.0,ball_speed_mps:30.2,spin_rate_rpm:7070,carry_m:68.9,side_m:-5.1,smash_factor:1.162},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"SW",shot_num:2,club_speed_mps:26.4,attack_angle_deg:-2.4,ball_speed_mps:27.4,spin_rate_rpm:8080,carry_m:58.6,side_m:5.2,smash_factor:1.038},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"SW",shot_num:3,club_speed_mps:26.6,attack_angle_deg:-1.8,ball_speed_mps:28.6,spin_rate_rpm:7620,carry_m:63.1,side_m:-2.0,smash_factor:1.075},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"SW",shot_num:4,club_speed_mps:25.8,attack_angle_deg:-3.6,ball_speed_mps:29.4,spin_rate_rpm:7590,carry_m:64.9,side_m:2.2,smash_factor:1.140},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:1,club_speed_mps:28.6,attack_angle_deg:0.0,ball_speed_mps:34.0,spin_rate_rpm:4120,carry_m:77.7,side_m:8.0,smash_factor:1.189},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:2,club_speed_mps:28.0,attack_angle_deg:-4.2,ball_speed_mps:35.8,spin_rate_rpm:8240,carry_m:86.4,side_m:26.4,smash_factor:1.279},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:3,club_speed_mps:28.6,attack_angle_deg:-3.2,ball_speed_mps:38.0,spin_rate_rpm:4520,carry_m:94.6,side_m:7.7,smash_factor:1.329},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:4,club_speed_mps:26.2,attack_angle_deg:null,ball_speed_mps:30.5,spin_rate_rpm:3190,carry_m:48.0,side_m:-5.6,smash_factor:1.164},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:5,club_speed_mps:null,attack_angle_deg:null,ball_speed_mps:-1.2,spin_rate_rpm:5010,carry_m:76.1,side_m:7.6,smash_factor:null},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:6,club_speed_mps:28.2,attack_angle_deg:-3.2,ball_speed_mps:33.1,spin_rate_rpm:4920,carry_m:101.3,side_m:-1.8,smash_factor:1.174},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:7,club_speed_mps:28.5,attack_angle_deg:-4.8,ball_speed_mps:40.0,spin_rate_rpm:7500,carry_m:88.7,side_m:-7.1,smash_factor:1.404},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:8,club_speed_mps:28.8,attack_angle_deg:-1.8,ball_speed_mps:36.4,spin_rate_rpm:4430,carry_m:83.1,side_m:-24.1,smash_factor:1.264},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:9,club_speed_mps:28.6,attack_angle_deg:-4.8,ball_speed_mps:35.3,spin_rate_rpm:7690,carry_m:65.3,side_m:-1.0,smash_factor:1.234},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:10,club_speed_mps:28.6,attack_angle_deg:-4.6,ball_speed_mps:35.6,spin_rate_rpm:7930,carry_m:85.3,side_m:23.2,smash_factor:1.245},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:11,club_speed_mps:29.7,attack_angle_deg:null,ball_speed_mps:38.8,spin_rate_rpm:5240,carry_m:97.4,side_m:-28.2,smash_factor:1.306},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:12,club_speed_mps:29.4,attack_angle_deg:-2.8,ball_speed_mps:38.3,spin_rate_rpm:5650,carry_m:94.4,side_m:22.2,smash_factor:1.303},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:13,club_speed_mps:29.6,attack_angle_deg:-3.2,ball_speed_mps:35.4,spin_rate_rpm:6550,carry_m:84.7,side_m:-12.8,smash_factor:1.196},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:14,club_speed_mps:28.6,attack_angle_deg:-3.2,ball_speed_mps:35.4,spin_rate_rpm:4040,carry_m:81.5,side_m:-22.3,smash_factor:1.238},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:15,club_speed_mps:27.8,attack_angle_deg:-1.2,ball_speed_mps:35.3,spin_rate_rpm:4760,carry_m:81.1,side_m:7.3,smash_factor:1.270},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:16,club_speed_mps:29.1,attack_angle_deg:-3.2,ball_speed_mps:33.5,spin_rate_rpm:5100,carry_m:84.1,side_m:-16.4,smash_factor:1.151},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:17,club_speed_mps:27.8,attack_angle_deg:-1.0,ball_speed_mps:36.1,spin_rate_rpm:4300,carry_m:88.0,side_m:7.0,smash_factor:1.299},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"7i",shot_num:18,club_speed_mps:27.3,attack_angle_deg:-1.8,ball_speed_mps:33.7,spin_rate_rpm:3810,carry_m:76.6,side_m:-4.0,smash_factor:1.234},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:1,club_speed_mps:30.8,attack_angle_deg:-4.8,ball_speed_mps:38.1,spin_rate_rpm:5940,carry_m:90.9,side_m:31.2,smash_factor:1.237},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:2,club_speed_mps:29.5,attack_angle_deg:-2.4,ball_speed_mps:39.9,spin_rate_rpm:4160,carry_m:96.7,side_m:16.9,smash_factor:1.353},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:3,club_speed_mps:30.8,attack_angle_deg:-4.0,ball_speed_mps:40.8,spin_rate_rpm:5960,carry_m:65.7,side_m:25.9,smash_factor:1.325},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:4,club_speed_mps:28.1,attack_angle_deg:null,ball_speed_mps:32.9,spin_rate_rpm:5880,carry_m:76.3,side_m:9.4,smash_factor:1.171},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:5,club_speed_mps:30.4,attack_angle_deg:null,ball_speed_mps:27.0,spin_rate_rpm:5720,carry_m:55.5,side_m:-5.9,smash_factor:0.888},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:6,club_speed_mps:30.5,attack_angle_deg:-4.4,ball_speed_mps:41.1,spin_rate_rpm:4860,carry_m:98.4,side_m:20.3,smash_factor:1.348},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:7,club_speed_mps:30.4,attack_angle_deg:-2.4,ball_speed_mps:30.6,spin_rate_rpm:3950,carry_m:48.4,side_m:-1.7,smash_factor:1.007},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:8,club_speed_mps:28.4,attack_angle_deg:-4.2,ball_speed_mps:40.4,spin_rate_rpm:3530,carry_m:78.0,side_m:13.1,smash_factor:1.423},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:9,club_speed_mps:30.7,attack_angle_deg:-5.0,ball_speed_mps:40.7,spin_rate_rpm:4910,carry_m:90.1,side_m:-23.7,smash_factor:1.326},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:10,club_speed_mps:29.3,attack_angle_deg:-0.2,ball_speed_mps:26.9,spin_rate_rpm:5460,carry_m:52.3,side_m:2.3,smash_factor:0.918},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:11,club_speed_mps:31.8,attack_angle_deg:-3.6,ball_speed_mps:42.3,spin_rate_rpm:6490,carry_m:101.5,side_m:45.9,smash_factor:1.330},
+{session_date:"2024-07-19",session_id:"308e1695-f545-ef11-8469-b03cdc8d9414",club:"5W",shot_num:12,club_speed_mps:30.8,attack_angle_deg:-4.0,ball_speed_mps:43.3,spin_rate_rpm:3810,carry_m:94.4,side_m:9.5,smash_factor:1.406}
+];
+
+// Compute smash_factor where missing
+RAW.forEach(s => {
+  if (s.smash_factor == null && s.ball_speed_mps != null && s.club_speed_mps != null && s.club_speed_mps > 0) {
+    s.smash_factor = +(s.ball_speed_mps / s.club_speed_mps).toFixed(3);
+  }
+});
+
+// Extract unique dates and clubs
+const allDates = [...new Set(RAW.map(s => s.session_date))].sort();
+const allClubs = [...new Set(RAW.map(s => s.club))].sort((a, b) => {
+  const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+  return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+});
+
+let selectedDates = new Set(allDates);
+let selectedClubs = new Set(allClubs);
+
+// --- Build filter checkboxes ---
+function buildChecks(containerId, items, selectedSet, colorMap) {
+  const el = document.getElementById(containerId);
+  // All toggle
+  const allLbl = document.createElement('label');
+  allLbl.className = 'all-toggle';
+  const allCb = document.createElement('input');
+  allCb.type = 'checkbox';
+  allCb.checked = true;
+  allCb.addEventListener('change', () => {
+    const checks = el.querySelectorAll('input[type=checkbox]:not(:first-of-type)');
+    checks.forEach(c => { c.checked = allCb.checked; });
+    if (allCb.checked) items.forEach(i => selectedSet.add(i)); else selectedSet.clear();
+    refresh();
+  });
+  allLbl.appendChild(allCb);
+  allLbl.appendChild(document.createTextNode('All'));
+  el.appendChild(allLbl);
+
+  items.forEach(item => {
+    const lbl = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.addEventListener('change', () => {
+      if (cb.checked) selectedSet.add(item); else selectedSet.delete(item);
+      refresh();
+    });
+    lbl.appendChild(cb);
+    const txt = item === 'Unknown' ? 'Unknown*' : item;
+    lbl.appendChild(document.createTextNode(txt));
+    if (colorMap && colorMap[item]) {
+      lbl.style.borderLeftColor = colorMap[item];
+      lbl.style.borderLeftWidth = '3px';
+    }
+    el.appendChild(lbl);
+  });
+}
+// Populate session dropdown
+(function() {
+  const sel = document.getElementById('session-select');
+  allDates.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d;
+    opt.textContent = d;
+    sel.appendChild(opt);
+  });
+})();
+function onSessionChange() {
+  const val = document.getElementById('session-select').value;
+  if (val === 'all') { selectedDates = new Set(allDates); }
+  else { selectedDates = new Set([val]); }
+  refresh();
+}
+buildChecks('club-filters', allClubs, selectedClubs, CLUB_COLORS);
+
+// --- Conversion helpers ---
+function convDist(m) { return units === 'imperial' ? m * M_TO_YD : m; }
+function convSpd(mps) { return units === 'imperial' ? mps * MPS_TO_MPH : mps; }
+function fmtDist(m) { if (m == null) return '--'; return convDist(m).toFixed(1); }
+function fmtSpd(mps) { if (mps == null) return '--'; return convSpd(mps).toFixed(1); }
+function fmtSide(m) {
+  if (m == null) return '--';
+  const v = convDist(Math.abs(m));
+  return v.toFixed(1) + (m >= 0 ? 'R' : 'L');
+}
+function distUnit() { return units === 'imperial' ? 'yd' : 'm'; }
+function spdUnit() { return units === 'imperial' ? 'mph' : 'm/s'; }
+
+function qualityTier(sf) {
+  if (sf == null) return { label: '--', cls: '' };
+  if (sf >= 1.42) return { label: 'Pure', cls: 'pill-pure' };
+  if (sf >= 1.30) return { label: 'Good', cls: 'pill-good' };
+  if (sf >= 1.0)  return { label: 'OK',   cls: 'pill-ok' };
+  return { label: 'Mishit', cls: 'pill-mishit' };
+}
+
+// --- IQR computation ---
+function computeIQRBounds() {
+  const bounds = {};
+  allClubs.forEach(club => {
+    const carries = RAW.filter(s => s.club === club && s.carry_m != null).map(s => s.carry_m).sort((a,b) => a - b);
+    if (carries.length < 4) { bounds[club] = null; return; }
+    const q1 = carries[Math.floor(carries.length * 0.25)];
+    const q3 = carries[Math.floor(carries.length * 0.75)];
+    const iqr = q3 - q1;
+    bounds[club] = { lo: q1 - 1.5 * iqr, hi: q3 + 1.5 * iqr };
+  });
+  return bounds;
+}
+
+function getFilteredData() {
+  const mode = document.getElementById('outlier-mode').value;
+  const iqrBounds = mode === 'iqr' ? computeIQRBounds() : null;
+
+  return RAW.filter(s => selectedDates.has(s.session_date) && selectedClubs.has(s.club)).map(s => {
+    let filtered = false;
+    if (mode === 'mishit' && s.smash_factor != null && s.smash_factor < 1.0) filtered = true;
+    if (mode === 'iqr' && iqrBounds[s.club] && s.carry_m != null) {
+      const b = iqrBounds[s.club];
+      if (s.carry_m < b.lo || s.carry_m > b.hi) filtered = true;
+    }
+    return { ...s, _filtered: filtered };
+  });
+}
+
+function avg(arr) { if (!arr.length) return null; return arr.reduce((a,b) => a + b, 0) / arr.length; }
+function stddev(arr) {
+  if (arr.length < 2) return null;
+  const m = avg(arr);
+  return Math.sqrt(arr.reduce((s, v) => s + (v - m) * (v - m), 0) / (arr.length - 1));
+}
+
+// --- Set units ---
+function setUnits(u) {
+  units = u;
+  document.getElementById('btn-imperial').classList.toggle('active', u === 'imperial');
+  document.getElementById('btn-metric').classList.toggle('active', u === 'metric');
+  refresh();
+}
+
+// --- Main refresh ---
+function refresh() {
+  const data = getFilteredData();
+  const active = data.filter(s => !s._filtered);
+  const filteredCount = data.filter(s => s._filtered).length;
+
+  // Shot count
+  document.getElementById('shot-count').innerHTML =
+    'Showing <strong>' + active.length + '</strong> of ' + data.length + ' shots' +
+    (filteredCount ? ' (' + filteredCount + ' filtered)' : '');
+
+  renderCards(active);
+  renderDispersion(active);
+  renderClubCarryChart(active);
+  renderSmashChart(active);
+  renderSpinChart(active);
+  renderInsights(active);
+  renderAveragesTable(active);
+  renderShotsTable(data);
+}
+
+// --- Coaching Takeaways & Practice Plan ---
+function renderInsights(shots) {
+  const twEl = document.getElementById('takeaways-content');
+  const ppEl = document.getElementById('practice-plan-content');
+  const known = shots.filter(s => s.club !== 'Unknown');
+  if (known.length < 5) {
+    twEl.innerHTML = '<p style="color:var(--text-dim);font-size:14px;margin-top:10px">Not enough data to generate takeaways.</p>';
+    ppEl.innerHTML = '';
+    return;
+  }
+
+  const clubs = [...new Set(known.map(s => s.club))].sort((a,b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+
+  const clubStats = {};
+  clubs.forEach(c => {
+    const cs = known.filter(s => s.club === c);
+    const carries = cs.map(s => s.carry_m).filter(v => v != null);
+    const sides = cs.map(s => s.side_m).filter(v => v != null);
+    const smashes = cs.map(s => s.smash_factor).filter(v => v != null);
+    const spins = cs.map(s => s.spin_rate_rpm).filter(v => v != null);
+    const cleanCarries = cs.filter(s => s.smash_factor != null && s.smash_factor >= 1.0 && s.carry_m != null).map(s => s.carry_m);
+    const mishits = smashes.filter(v => v < 1.0);
+    clubStats[c] = {
+      n: cs.length,
+      avgCarry: avg(carries), carrySigma: carries.length >= 2 ? stddev(carries) : null,
+      avgSide: avg(sides), sideSigma: sides.length >= 2 ? stddev(sides) : null,
+      avgSmash: avg(smashes), avgSpin: avg(spins),
+      cleanAvgCarry: avg(cleanCarries), cleanN: cleanCarries.length,
+      mishitN: mishits.length, mishitPct: smashes.length ? mishits.length / smashes.length * 100 : 0
+    };
+  });
+
+  const takeaways = [];
+  let num = 1;
+
+  // Find most reliable club (lowest carry sigma)
+  const reliableClubs = clubs.filter(c => clubStats[c].carrySigma != null && clubStats[c].n >= 5);
+  if (reliableClubs.length) {
+    const best = reliableClubs.sort((a,b) => clubStats[a].carrySigma - clubStats[b].carrySigma)[0];
+    const s = clubStats[best];
+    takeaways.push({
+      title: num++ + '. The ' + best + ' is your most reliable club right now',
+      body: best + ' carry standard deviation is <span class="num">' + fmtDist(s.carrySigma) + ' ' + distUnit() + '</span>. ' +
+        'Direction averages <span class="num">' + fmtSide(s.avgSide) + '</span> with a side sigma of ' + fmtDist(s.sideSigma) + ' ' + distUnit() + '. ' +
+        (s.mishitN === 0 ? 'Zero mishits — pure consistency.' : 'Only ' + s.mishitN + ' mishit' + (s.mishitN > 1 ? 's' : '') + ' out of ' + s.n + ' shots.') +
+        ' Use it as your stock club for any shot where you need to hit a number.'
+    });
+  }
+
+  // Find worst contact club
+  const contactClubs = clubs.filter(c => clubStats[c].avgSmash != null && clubStats[c].n >= 5);
+  if (contactClubs.length) {
+    const worst = contactClubs.sort((a,b) => clubStats[a].avgSmash - clubStats[b].avgSmash)[0];
+    const s = clubStats[worst];
+    if (s.mishitPct > 10) {
+      takeaways.push({
+        title: num++ + '. ' + worst + ' strike consistency is the leak',
+        body: 'When you make clean contact (' + s.cleanN + ' of ' + s.n + ' shots), ' + worst + ' carries an average of <span class="num">' + fmtDist(s.cleanAvgCarry) + ' ' + distUnit() + '</span> at <span class="num">' + (s.avgSmash >= 1.0 ? s.avgSmash.toFixed(2) : '--') + '</span> avg smash. ' +
+          'But <span class="num">' + s.mishitN + '</span> of ' + s.n + ' shots had smash factors under 1.0, dragging your raw average down to ' + fmtDist(s.avgCarry) + ' ' + distUnit() + '. Strike rate, not speed, is the gap.'
+      });
+    }
+  }
+
+  // Worst dispersion club
+  const dispClubs = clubs.filter(c => clubStats[c].sideSigma != null && clubStats[c].n >= 5);
+  if (dispClubs.length) {
+    const worst = dispClubs.sort((a,b) => clubStats[b].sideSigma - clubStats[a].sideSigma)[0];
+    const s = clubStats[worst];
+    if (s.sideSigma > 15) {
+      const dir = s.avgSide < -3 ? 'pulls left' : s.avgSide > 3 ? 'pushes right' : 'sprays both ways';
+      takeaways.push({
+        title: num++ + '. ' + worst + ' ' + dir + ' — direction work needed',
+        body: 'Average ' + worst + ' side: <span class="num">' + fmtSide(s.avgSide) + '</span>. Your side dispersion ' + String.fromCharCode(963) + ' is <span class="num">' + fmtDist(s.sideSigma) + ' ' + distUnit() + '</span>. ' +
+          (s.avgSpin > 4000 && (worst === 'Dr' || worst === '5W') ?
+            'The pattern combined with high spin (<span class="num">' + Math.round(s.avgSpin).toLocaleString() + '</span> rpm) suggests an over-the-top delivery — face closing through impact + steep attack angle. Worth filming to confirm.' :
+            'Focus on consistent face angle and swing path. Alignment stick drills and face-tape checks will help isolate the cause.')
+      });
+    }
+  }
+
+  // Spin check on woods/driver
+  clubs.forEach(c => {
+    if (c !== 'Dr' && c !== '5W') return;
+    const s = clubStats[c];
+    if (!s || s.n < 3 || !s.avgSpin) return;
+    const ideal = c === 'Dr' ? [2000, 3000] : [2500, 3500];
+    if (s.avgSpin > ideal[1] + 500) {
+      takeaways.push({
+        title: num++ + '. ' + c + ' spin is too high — losing distance',
+        body: c + ' spin averages <span class="num">' + Math.round(s.avgSpin).toLocaleString() + '</span> rpm vs. the ' + ideal[0].toLocaleString() + '–' + ideal[1].toLocaleString() + ' rpm ideal range. ' +
+          'High spin causes the ball to balloon and lose carry. Try hitting more up on it (positive attack angle) and check your tee height. A more neutral face-to-path also helps reduce spin loft.'
+      });
+    }
+  });
+
+  // Spin check on irons (too low)
+  clubs.forEach(c => {
+    if (c === 'Dr' || c === '5W' || c === 'SW') return;
+    const s = clubStats[c];
+    if (!s || s.n < 3 || !s.avgSpin) return;
+    const idealLo = c === '5i' ? 5000 : c === '7i' ? 5500 : c === '8i' ? 6000 : c === 'PW' ? 7000 : 5000;
+    if (s.avgSpin < idealLo * 0.8) {
+      takeaways.push({
+        title: num++ + '. ' + c + ' spin is a touch low — possible thin strike pattern',
+        body: c + ' spin averages <span class="num">' + Math.round(s.avgSpin).toLocaleString() + '</span> rpm vs. a typical range of ' + idealLo.toLocaleString() + '+ rpm for that loft. ' +
+          'Ball speed is solid when you find the center, but lower spin generally means thin contact (impact below center) or delofted face. Worth a face-tape check next session.'
+      });
+    }
+  });
+
+  // Overall mishit rate
+  const allSmash = known.filter(s => s.smash_factor != null);
+  const allMishits = allSmash.filter(s => s.smash_factor < 1.0);
+  if (allSmash.length >= 10 && allMishits.length / allSmash.length > 0.08) {
+    takeaways.push({
+      title: num++ + '. Overall mishit rate needs attention',
+      body: '<span class="num">' + allMishits.length + '</span> of ' + allSmash.length + ' total shots (' + (allMishits.length / allSmash.length * 100).toFixed(1) + '%) had a smash factor under 1.0. ' +
+        'Tour average is around 3–5%. Focus on center-face contact across all clubs — strike quality is the biggest lever for distance consistency.'
+    });
+  }
+
+  twEl.innerHTML = takeaways.length
+    ? takeaways.map(t => '<div class="takeaway"><h4>' + t.title + '</h4><p>' + t.body + '</p></div>').join('')
+    : '<p style="color:var(--text-dim);font-size:14px;margin-top:10px">Not enough data to generate takeaways.</p>';
+
+  // Practice plan
+  const drills = [];
+  const worstStrike = contactClubs.length ? contactClubs.sort((a,b) => clubStats[a].avgSmash - clubStats[b].avgSmash)[0] : null;
+  const bestClub = reliableClubs.length ? reliableClubs.sort((a,b) => clubStats[a].carrySigma - clubStats[b].carrySigma)[0] : null;
+  const worstDisp = dispClubs.length ? dispClubs.sort((a,b) => clubStats[b].sideSigma - clubStats[a].sideSigma)[0] : null;
+
+  if (worstStrike && clubStats[worstStrike].mishitPct > 10) {
+    drills.push('<strong>Strike-first ' + worstStrike + ' block (15 balls):</strong> ' +
+      (worstStrike === 'Dr' || worstStrike === '5W'
+        ? 'Tee a ball low and put a tee 2 inches in front of the ball. Make passes that brush both. The goal is shallow, low-point control. Don\'t worry about distance; chase center contact.'
+        : 'Hit half-swing shots focusing purely on center-face contact. Use face tape if available. Build up to full swings only after 5 consecutive center strikes.'));
+  }
+
+  if (bestClub) {
+    drills.push('<strong>' + bestClub + ' confidence block (10 balls):</strong> Pick a target line, lay a club on the ground, and hit shots at 80% effort. Prove to yourself that your stock ' + bestClub + ' is repeatable. Expect every ball to start within 5 yards of the line.');
+  }
+
+  if (worstStrike && bestClub && worstStrike !== bestClub) {
+    const baseline = clubStats[worstStrike].cleanAvgCarry;
+    drills.push('<strong>Mixed gapping block (10 balls):</strong> Alternate ' + bestClub + ' and ' + worstStrike + '. Goal: every ' + worstStrike + ' must carry ' + (baseline ? fmtDist(baseline * 0.9) + '+ ' + distUnit() : 'your clean-shot baseline') + '. Walk away from the bay if you can\'t string 3 in a row.');
+  }
+
+  if (worstDisp) {
+    drills.push('<strong>Diagnostic priority:</strong> Next session, ask Trackman for Club Path and Face-to-Path on ' + worstDisp + '. Understanding path vs. face will let you prescribe the right fix — alignment work vs. swing path change.');
+  }
+
+  ppEl.innerHTML = drills.length
+    ? '<div class="practice-plan"><ol>' + drills.map(d => '<li>' + d + '</li>').join('') + '</ol></div>'
+    : '';
+}
+
+// --- Club Cards ---
+function renderCards(shots) {
+  const el = document.getElementById('club-cards');
+  el.innerHTML = '';
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  clubs.forEach(club => {
+    const cs = shots.filter(s => s.club === club);
+    const carries = cs.map(s => s.carry_m).filter(v => v != null);
+    const ballSpeeds = cs.map(s => s.ball_speed_mps).filter(v => v != null && v > 0);
+    const smashes = cs.map(s => s.smash_factor).filter(v => v != null);
+    const sides = cs.map(s => s.side_m).filter(v => v != null);
+    const spins = cs.map(s => s.spin_rate_rpm).filter(v => v != null);
+    const color = CLUB_COLORS[club] || '#6b7280';
+
+    const card = document.createElement('div');
+    card.className = 'club-card';
+    card.style.cssText = '--c:' + color;
+    card.querySelector; // force style
+    card.innerHTML =
+      '<style>.club-card[style*="--c:' + color + '"]::before{background:' + color + '}</style>' +
+      '<div class="club-name" style="color:' + color + '">' + club + '</div>' +
+      (club === 'Unknown' ? '<div class="club-note">Club not set on Trackman</div>' : '') +
+      '<div class="shot-cnt">' + cs.length + ' shots</div>' +
+      '<div class="stats">' +
+        stat('Avg Carry', fmtDist(avg(carries)) + ' ' + distUnit()) +
+        stat('Avg Ball Spd', fmtSpd(avg(ballSpeeds)) + ' ' + spdUnit()) +
+        stat('Avg Smash', smashes.length ? avg(smashes).toFixed(3) : '--') +
+        stat('Carry ' + String.fromCharCode(963), carries.length >= 2 ? fmtDist(stddev(carries)) + ' ' + distUnit() : '--') +
+        stat('Avg Side', sides.length ? fmtSide(avg(sides)) : '--') +
+        stat('Avg Spin', spins.length ? Math.round(avg(spins)).toLocaleString() + ' rpm' : '--') +
+      '</div>';
+    el.appendChild(card);
+  });
+}
+function stat(label, value) {
+  return '<div class="stat"><span class="label">' + label + '</span><span class="value">' + value + '</span></div>';
+}
+
+// --- Dispersion Chart ---
+function renderDispersion(shots) {
+  const ctx = document.getElementById('chart-dispersion').getContext('2d');
+  if (chartDispersion) chartDispersion.destroy();
+
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const datasets = clubs.map(club => {
+    const pts = shots.filter(s => s.club === club && s.carry_m != null && s.side_m != null);
+    return {
+      label: club,
+      data: pts.map(s => ({ x: convDist(s.carry_m), y: convDist(s.side_m), _raw: s })),
+      backgroundColor: (CLUB_COLORS[club] || '#6b7280') + 'cc',
+      borderColor: CLUB_COLORS[club] || '#6b7280',
+      borderWidth: 1,
+      pointRadius: 5,
+      pointHoverRadius: 7
+    };
+  });
+
+  chartDispersion = new Chart(ctx, {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#8a95a3', font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: function(c) {
+              const s = c.raw._raw;
+              return s.club + ' #' + s.shot_num + ' | Carry: ' + fmtDist(s.carry_m) + ' ' + distUnit() +
+                     ' | Side: ' + fmtSide(s.side_m) +
+                     (s.smash_factor != null ? ' | Smash: ' + s.smash_factor.toFixed(3) : '');
+            }
+          }
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Carry (' + distUnit() + ')', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } },
+        y: { title: { display: true, text: 'Side (' + distUnit() + ')', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } }
+      }
+    }
+  });
+}
+
+// --- Carry by Club Chart ---
+function renderClubCarryChart(shots) {
+  const ctx = document.getElementById('chart-club-carry').getContext('2d');
+  if (chartSession) chartSession.destroy();
+
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const avgCarries = clubs.map(club => {
+    const carries = shots.filter(s => s.club === club && s.carry_m != null).map(s => s.carry_m);
+    return carries.length ? convDist(avg(carries)) : 0;
+  });
+  const sigmas = clubs.map(club => {
+    const carries = shots.filter(s => s.club === club && s.carry_m != null).map(s => s.carry_m);
+    return carries.length >= 2 ? convDist(stddev(carries)) : 0;
+  });
+
+  const tourCarry = clubs.map(c => TOUR_CARRY_M[c] != null ? convDist(TOUR_CARRY_M[c]) : null);
+  const scratchCarry = clubs.map(c => SCRATCH_CARRY_M[c] != null ? convDist(SCRATCH_CARRY_M[c]) : null);
+
+  chartSession = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: clubs,
+      datasets: [{
+        label: 'Your Avg Carry',
+        data: avgCarries,
+        backgroundColor: clubs.map(c => (CLUB_COLORS[c] || '#6b7280') + 'cc'),
+        borderColor: clubs.map(c => CLUB_COLORS[c] || '#6b7280'),
+        borderWidth: 1,
+        order: 2
+      },{
+        label: 'Tour Avg',
+        data: tourCarry,
+        type: 'line',
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16,185,129,0.1)',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 4,
+        pointBackgroundColor: '#10b981',
+        fill: false,
+        order: 0
+      },{
+        label: 'Scratch Avg',
+        data: scratchCarry,
+        type: 'line',
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245,158,11,0.1)',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 4,
+        pointBackgroundColor: '#f59e0b',
+        fill: false,
+        order: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#8a95a3', font: { size: 11 } } } },
+      scales: {
+        x: { grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } },
+        y: { title: { display: true, text: 'Carry (' + distUnit() + ')', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } }
+      }
+    }
+  });
+}
+
+// --- Smash Factor Chart ---
+function renderSmashChart(shots) {
+  const ctx = document.getElementById('chart-smash').getContext('2d');
+  if (chartSmash) chartSmash.destroy();
+
+  const withSmash = shots.filter(s => s.smash_factor != null);
+  const colors = withSmash.map(s => {
+    if (s.smash_factor >= 1.42) return '#10b981';
+    if (s.smash_factor >= 1.30) return '#f59e0b';
+    if (s.smash_factor >= 1.0) return '#8a95a3';
+    return '#ef4444';
+  });
+
+  chartSmash = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: withSmash.map((s, i) => s.club + ' #' + s.shot_num),
+      datasets: [{
+        data: withSmash.map(s => s.smash_factor),
+        backgroundColor: colors,
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(c) {
+              const s = withSmash[c.dataIndex];
+              return s.session_date + ' | ' + s.club + ' #' + s.shot_num + ' | Smash: ' + s.smash_factor.toFixed(3);
+            }
+          }
+        }
+      },
+      scales: {
+        x: { display: false },
+        y: { title: { display: true, text: 'Smash Factor', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' },
+          suggestedMin: 0.5, suggestedMax: 1.6 }
+      }
+    }
+  });
+}
+
+// --- Spin Rate Chart ---
+function renderSpinChart(shots) {
+  const ctx = document.getElementById('chart-spin').getContext('2d');
+  if (chartSpin) chartSpin.destroy();
+
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  const avgSpins = clubs.map(club => {
+    const spins = shots.filter(s => s.club === club && s.spin_rate_rpm != null).map(s => s.spin_rate_rpm);
+    return spins.length ? avg(spins) : 0;
+  });
+
+  const tourSpin = clubs.map(c => TOUR_SPIN[c] != null ? TOUR_SPIN[c] : null);
+  const scratchSpin = clubs.map(c => SCRATCH_SPIN[c] != null ? SCRATCH_SPIN[c] : null);
+
+  chartSpin = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: clubs,
+      datasets: [{
+        label: 'Your Avg Spin',
+        data: avgSpins,
+        backgroundColor: clubs.map(c => (CLUB_COLORS[c] || '#6b7280') + 'cc'),
+        borderColor: clubs.map(c => CLUB_COLORS[c] || '#6b7280'),
+        borderWidth: 1,
+        order: 2
+      },{
+        label: 'Tour Avg',
+        data: tourSpin,
+        type: 'line',
+        borderColor: '#10b981',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 4,
+        pointBackgroundColor: '#10b981',
+        fill: false,
+        order: 0
+      },{
+        label: 'Scratch Avg',
+        data: scratchSpin,
+        type: 'line',
+        borderColor: '#f59e0b',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 4,
+        pointBackgroundColor: '#f59e0b',
+        fill: false,
+        order: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#8a95a3', font: { size: 11 } } } },
+      scales: {
+        x: { grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } },
+        y: { title: { display: true, text: 'Avg Spin (rpm)', color: '#8a95a3' }, grid: { color: '#2d3640' }, ticks: { color: '#8a95a3' } }
+      }
+    }
+  });
+}
+
+// --- Club Averages Table ---
+function renderAveragesTable(shots) {
+  const tbody = document.getElementById('avg-body');
+  tbody.innerHTML = '';
+  const clubs = [...new Set(shots.map(s => s.club))].sort((a, b) => {
+    const ia = CLUB_ORDER.indexOf(a), ib = CLUB_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+
+  clubs.forEach(club => {
+    const cs = shots.filter(s => s.club === club);
+    const carries = cs.map(s => s.carry_m).filter(v => v != null);
+    const ballSpeeds = cs.map(s => s.ball_speed_mps).filter(v => v != null && v > 0);
+    const smashes = cs.map(s => s.smash_factor).filter(v => v != null);
+    const spins = cs.map(s => s.spin_rate_rpm).filter(v => v != null);
+    const sides = cs.map(s => s.side_m).filter(v => v != null);
+    const color = CLUB_COLORS[club] || '#6b7280';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td style="color:' + color + ';font-weight:600">' + club + (club === 'Unknown' ? '*' : '') + '</td>' +
+      '<td>' + cs.length + '</td>' +
+      '<td>' + fmtDist(avg(carries)) + ' ' + distUnit() + '</td>' +
+      '<td>' + (carries.length >= 2 ? fmtDist(stddev(carries)) : '--') + '</td>' +
+      '<td>' + fmtSpd(avg(ballSpeeds)) + ' ' + spdUnit() + '</td>' +
+      '<td>' + (smashes.length ? avg(smashes).toFixed(3) : '--') + '</td>' +
+      '<td>' + (spins.length ? Math.round(avg(spins)).toLocaleString() : '--') + '</td>' +
+      '<td>' + (sides.length ? fmtSide(avg(sides)) : '--') + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// --- Per-Shot Detail Table ---
+function renderShotsTable(data) {
+  const sorted = [...data].sort((a, b) => {
+    let va = a[sortKey], vb = b[sortKey];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (sortKey === 'session_date' || sortKey === 'club') {
+      if (sortKey === 'club') {
+        va = CLUB_ORDER.indexOf(va); if (va === -1) va = 99;
+        vb = CLUB_ORDER.indexOf(vb); if (vb === -1) vb = 99;
+      }
+      return va < vb ? -sortDir : va > vb ? sortDir : 0;
+    }
+    return (va - vb) * sortDir;
+  });
+
+  const tbody = document.getElementById('shots-body');
+  tbody.innerHTML = '';
+
+  sorted.forEach(s => {
+    const q = qualityTier(s.smash_factor);
+    const tr = document.createElement('tr');
+    if (s._filtered) tr.className = 'dimmed';
+    tr.innerHTML =
+      '<td>' + s.session_date + '</td>' +
+      '<td style="color:' + (CLUB_COLORS[s.club] || '#6b7280') + '">' + s.club + '</td>' +
+      '<td>' + s.shot_num + '</td>' +
+      '<td>' + fmtSpd(s.club_speed_mps) + '</td>' +
+      '<td>' + fmtSpd(s.ball_speed_mps) + '</td>' +
+      '<td>' + (s.smash_factor != null ? s.smash_factor.toFixed(3) : '--') + '</td>' +
+      '<td>' + (s.attack_angle_deg != null ? s.attack_angle_deg.toFixed(1) + String.fromCharCode(176) : '--') + '</td>' +
+      '<td>' + (s.spin_rate_rpm != null ? s.spin_rate_rpm.toLocaleString() : '--') + '</td>' +
+      '<td>' + fmtDist(s.carry_m) + '</td>' +
+      '<td>' + fmtSide(s.side_m) + '</td>' +
+      '<td>' + (q.cls ? '<span class="pill ' + q.cls + '">' + q.label + '</span>' : '--') + '</td>';
+    tbody.appendChild(tr);
+  });
+
+  // Update sort arrows
+  document.querySelectorAll('#table-shots th[data-key]').forEach(th => {
+    const arrow = th.querySelector('.sort-arrow');
+    if (th.dataset.key === sortKey) {
+      arrow.textContent = sortDir === 1 ? ' ▲' : ' ▼';
+    } else {
+      arrow.textContent = '';
+    }
+  });
+}
+
+// Sort handler
+document.querySelectorAll('#table-shots th[data-key]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    if (sortKey === key) sortDir *= -1;
+    else { sortKey = key; sortDir = 1; }
+    refresh();
+  });
+});
+
+// Initial render
+refresh();
+</script>
+</body>
+</html>
